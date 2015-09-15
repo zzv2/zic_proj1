@@ -8,7 +8,7 @@ from zic_proj1.msg import State
 def robot_interface():
         rospy.init_node('robot_interface', anonymous=True)
 
-        state_publisher = rospy.Publisher('/state', String, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
+        state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
         
         config = rospy.get_param('/configuration')
         num_blocks = rospy.get_param("num_blocks")
@@ -22,7 +22,7 @@ def robot_interface():
             state.table = [0] * num_blocks
         else :
             state.stack = range(num_blocks, 1)
-            state.table = int32[num_blocks]
+            state.table = [0] * num_blocks #int32[num_blocks]
 
         rospy.loginfo(state)# prints to console
         rospy.loginfo("config: %s\n",config)# prints to console
