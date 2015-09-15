@@ -3,6 +3,7 @@
 #from beginner_tutorials.srv import * TODO need to replace
 import rospy
 from std_msgs.msg import String
+from zic_proj1.msg import State
 
 def robot_interface():
         rospy.init_node('robot_interface', anonymous=True)
@@ -11,7 +12,18 @@ def robot_interface():
         
         config = rospy.get_param('/configuration')
         num_blocks = rospy.get_param("num_blocks")
-        state = "current state: [1], [2], [3]\n"
+        # state = "current state: [1], [2], [3]\n"
+
+        state = State()
+        state.gripper_closed = False
+        state.block_in_gripper = 0
+        if config == "stacked_ascending" :
+            state.stack = range(1, num_blocks)
+            state.table = [0] * num_blocks
+        else :
+            state.stack = range(num_blocks, 1)
+            state.table = int32[num_blocks]
+
         rospy.loginfo(state)# prints to console
         rospy.loginfo("config: %s\n",config)# prints to console
 
