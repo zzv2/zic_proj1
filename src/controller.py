@@ -4,11 +4,11 @@ import rospy
 from std_msgs.msg import String
 
 def respond_to_command(command):
-    if command == "scatter":
+    if command == String("scatter"):
         rospy.loginfo("Received Command: scatter")
-    elif command == "stack_ascending":
+    elif command == String("stack_ascending"):
         rospy.loginfo("Received Command: stack_ascending")
-    elif command == "stack_descending":
+    elif command == String("stack_descending"):
         rospy.loginfo("Received Command: stack_ascending")
     else:
         rospy.logerr("Received Malformed Command")
