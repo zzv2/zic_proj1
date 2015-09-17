@@ -5,6 +5,7 @@ import rospy
 from std_msgs.msg import String
 from zic_proj1.msg import State
 from zic_proj1.srv import MoveRobot
+from zic_proj1.srv import GetState
 
 CLOSE_GRIPPER = 0
 OPEN_GRIPPER = 1

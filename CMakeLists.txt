@@ -54,6 +54,7 @@ add_message_files(
 add_service_files(
   FILES
   MoveRobot.srv
+  GetState.srv
 )
 
 ## Generate actions in the 'action' folder
