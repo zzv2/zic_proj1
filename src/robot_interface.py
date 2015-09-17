@@ -5,7 +5,13 @@ import rospy
 from std_msgs.msg import String
 from zic_proj1.msg import State
 from zic_proj1.srv import MoveRobot
-from config import *
+
+CLOSE_GRIPPER = 0
+OPEN_GRIPPER = 1
+MOVE_TO_BLOCK = 2
+MOVE_OVER_BLOCK = 3
+MOVE_OVER_TABLE = 4
+
 
 state = State()
 
@@ -16,37 +22,31 @@ def robot_interface():
 
         state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
         
+        move_robot_service = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
+        get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
+
+        print "Ready to move robot."
+
         config = rospy.get_param('configuration')
         num_blocks = rospy.get_param("num_blocks")
-        # state = "current state: [1], [2], [3]\n"
 
         state.gripper_closed = False
         state.block_in_gripper = 0
         state.stack = range(1, num_blocks)
         if config == "stacked_descending" :
             state.stack.reverse()
-        state.table = [] #int32[num_blocks]
+        state.table = []
 
-        #rospy.loginfo(state)# prints to console
-        rospy.loginfo("config: %s\n",config)# prints to console
-        rospy.loginfo("blocks: %d\n",num_blocks)# prints to console
+        rospy.loginfo("configuration: %s",config)
+        rospy.loginfo("num_blocks: %d",num_blocks)
 
-
-        #/move_robot
-        broadcast_rate = rospy.Rate(1) # 1 hz like instructions say
+        broadcast_rate = rospy.Rate(1) # 1 hz
         while not rospy.is_shutdown():
-            # hello_str = "hello world %s" % rospy.get_time()
-            # rospy.loginfo(hello_str)# prints to console
-            # pub.publish(hello_str)
-
             # publish state
             state_publisher.publish(state)
-            #rospy.loginfo(state)
             broadcast_rate.sleep()
 
-
-        s = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
-        print "Ready to move robot."
+        
         rospy.spin()
 
 def handle_move_robot(req):
@@ -78,16 +78,16 @@ def handle_move_robot(req):
             success = False
 
     elif req.action == MOVE_OVER_BLOCK :
-        print "Moved OVER to block " + req.target
+        print "Moved over block " + req.target
     elif req.action == MOVE_OVER_TABLE :
-        print "Moving over table"
+        print "Moved over table"
     else :
         print "invalid action"
 
     return MoveRobotResponse(success)
 
 def handle_get_world_state():
-    pass
+    return GetStateResponse(state)
 
 if __name__ == '__main__':
     try:
