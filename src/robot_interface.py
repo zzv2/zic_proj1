@@ -45,6 +45,7 @@ def robot_interface():
         while not rospy.is_shutdown():
             # publish state
             state_publisher.publish(state)
+            rospy.loginfo(state)
             broadcast_rate.sleep()
 
         
@@ -87,7 +88,7 @@ def handle_move_robot(req):
 
     return MoveRobotResponse(success)
 
-def handle_get_world_state():
+def handle_get_world_state(req):
     return GetStateResponse(state)
 
 if __name__ == '__main__':
