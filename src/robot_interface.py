@@ -4,6 +4,15 @@
 import rospy
 from std_msgs.msg import String
 from zic_proj1.msg import State
+from zic_proj1.srv import MoveRobot
+
+CLOSE_GRIPPER = 0
+OPEN_GRIPPER = 1
+MOVE_TO_BLOCK = 2
+MOVE_OVER_BLOCK = 3
+MOVE_OVER_TABLE = 4
+
+#locations on table will be given by function in this file
 
 def robot_interface():
         rospy.init_node('robot_interface', anonymous=True)
@@ -41,24 +50,26 @@ def robot_interface():
 
 
         s = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
-        print "Ready to add two ints."
+        print "Ready to move robot."
         rospy.spin()
 
 def handle_move_robot(req):
 
     success = True
 
-    if req.action == "open_gripper" :
+    if req.action == OPEN_GRIPPER :
         print "opened gripper"
-    elif req.action == "close_gripper" :
+        #Gripper.open ==> physical robot commands go here
+    elif req.action == CLOSE_GRIPPER :
         print "closed gripper"
 
-    elif req.action == "move_to_block" :
-        print "Moved to block " + req.block
+    elif req.action == MOVE_TO_BLOCK :
+        print "Moved to block " + req.target
 
-    elif req.action == "move_over_block" :
-        print "Moved OVER to block " + req.block
-
+    elif req.action == MOVE_OVER_BLOCK :
+        print "Moved OVER to block " + req.target
+    elif req.action == MOVE_OVER_TABLE :
+        print "Moving over table"
     else :
         print "invalid action"
 

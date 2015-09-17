@@ -1,4 +1,4 @@
-string action
-int32 block
+uint8 action
+int32 target
 ---
 bool success

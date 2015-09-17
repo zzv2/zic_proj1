@@ -1,6 +1,6 @@
 <launch>
 	<param name="num_blocks" value="4" type="int"/>
-	<param name="configuration" value="stacked_descending" />
+	<param name="configuration" value="stacked_descendingadsfasdfa" />
 	<param name="sim" value="false" />
 
 	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen">
