@@ -3,15 +3,19 @@
 import rospy
 from std_msgs.msg import String
 
-def talker():
-    pub = rospy.Publisher('chatter', String, queue_size=10)
-    rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(1) # 10hz
-    while not rospy.is_shutdown():
-        hello_str = "hello world %s" % rospy.get_time()
-        rospy.loginfo(hello_str)
-        pub.publish(hello_str)
-        rate.sleep()
+def callback(command):
+    pass
+
+def listener():
+    # Initialize node.  This name should be unique, so it is not anonymous
+    rospy.init_node('controller')
+
+    # the controller subscribes to the /command topic and listens for commands
+    rospy.Subscriber("command", string, callback)
+
+    rospy.spin()
+
+
 
 if __name__ == '__main__':
     try:
