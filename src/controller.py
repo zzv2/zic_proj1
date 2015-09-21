@@ -45,15 +45,15 @@ def scatter():
 
                     if move_robot(OPEN_GRIPPER, 0):
                         rospy.loginfo("Successfully deposited block {0} at its position on table.\n".format(current_block))
-                    else
+                    else:
                         rospy.logerr("Failed to let go of block {0}.".format(current_block))
                         raise UnrecoverableWorldStateException("Dislodged block {0} on table".format(current_block))
-                else
+                else:
                     rospy.logerr("Failed to move block {0} to its position on table".format(current_block))
                     raise UnrecoverableWorldStateException("Dropped block on the way to table")
-            else
+            else:
                 rospy.logerr("Failed to close gripper around block {0}, retrying".format(current_block))
-        else
+        else:
             rospy.logerr("Failed to move hand to block {0}, retrying".format(current_block))
 
     rospy.loginfo("Successfully scattered blocks.\n\n")
