@@ -30,6 +30,7 @@ def scatter():
 
     while len(get_state().stack) > 0:
         rospy.loginfo("There are {0} blocks on the stack".format(len(get_state().stack)))
+        rospy.loginfo("There are {0} blocks on the table".format(len(get_state().table)))
         current_block = get_state().stack[-1]
         rospy.loginfo("Beginning to take block {0} off of the stack".format(n))
 

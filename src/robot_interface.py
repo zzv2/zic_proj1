@@ -27,7 +27,7 @@ def robot_interface():
 
         state.gripper_closed = False
         state.block_in_gripper = 0
-        state.stack = range(1, num_blocks)
+        state.stack = range(1, num_blocks+1)
         if config == "stacked_descending" :
             state.stack.reverse()
         state.table = []
