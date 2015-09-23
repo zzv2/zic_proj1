@@ -29,10 +29,11 @@ def scatter():
     rospy.loginfo("There are {0} blocks to deal with".format(n))
 
     while len(get_state().stack) > 0:
+        rospy.loginfo("\nBeginnning remove block subroutine")
         rospy.loginfo("There are {0} blocks on the stack".format(len(get_state().stack)))
         rospy.loginfo("There are {0} blocks on the table".format(len(get_state().table)))
         current_block = get_state().stack[-1]
-        rospy.loginfo("Beginning to take block {0} off of the stack".format(n))
+        rospy.loginfo("Beginning to take block {0} off of the stack".format(current_block))
 
         rospy.loginfo("Beginning to move hand to block {0}".format(current_block))
         if move_robot(MOVE_TO_BLOCK, current_block):

@@ -53,14 +53,15 @@ def handle_move_robot(req):
         #in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
         #Move_over_block
         print "opened gripper"
-        state.gripper_closed = False
-        state.block_in_gripper = 0
         if req.target == 0 : #putting block on table
-            state.table.append(req.target)
-            del state.stack[state.stack.index(req.target)]
+            state.table.append(state.block_in_gripper)
+            print "Deleting {0}".format(state.stack.index(state.block_in_gripper))
+            del state.stack[state.stack.index(state.block_in_gripper)]
         else : #appending to stack
-            state.stack.append(req.target)
-            del state.table[state.table.index(req.target)]
+            state.stack.append(state.block_in_gripper)
+            del state.table[state.table.index(state.block_in_gripper)]
+        state.block_in_gripper = 0
+        state.gripper_closed = False
 
         #Gripper.open ==> physical robot commands go here
     elif req.action == CLOSE_GRIPPER :
