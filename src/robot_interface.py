@@ -12,6 +12,7 @@ OPEN_GRIPPER = 1
 MOVE_TO_BLOCK = 2
 MOVE_OVER_BLOCK = 3
 MOVE_OVER_TABLE = 4
+MOVE_TO_STACK_BOTTOM = 5
 
 
 state = State()
@@ -83,6 +84,8 @@ def handle_move_robot(req):
         print "Moved over block " + req.target
     elif req.action == MOVE_OVER_TABLE :
         print "Moved over table"
+    elif req.action == MOVE_TO_STACK_BOTTOM :
+        print "Moved to stack bottom"
     else :
         print "invalid action"
 

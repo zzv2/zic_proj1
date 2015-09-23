@@ -66,7 +66,7 @@ def stack_ascending():
     if is_stacked_ascending(get_state().stack):
         rospy.loginfo("Blocks already stacked ascending.\n")
         return True
-    elif !is_scattered(get_state().table):
+    elif not is_scattered(get_state().table):
         rospy.loginfo("Blocks aren't scattered, beginning to scatter.\n")
         scatter()
 
