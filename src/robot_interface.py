@@ -5,7 +5,7 @@ import rospy
 from std_msgs.msg import String
 from zic_proj1.msg import State
 from zic_proj1.srv import MoveRobot
-from zic_proj1.srv import GetState
+from zic_proj1.srv import *
 from config import *
 
 state = State()
@@ -69,7 +69,7 @@ def handle_move_robot(req):
         state.block_in_gripper = req.target
 
     elif req.action == MOVE_TO_BLOCK :
-        print "Moved to block " + req.target
+        print "Moved to block {0}".format(req.target)
         if state.block_in_gripper > 0 or state.gripper_closed:
             success = False
 
@@ -85,7 +85,12 @@ def handle_move_robot(req):
     return MoveRobotResponse(success)
 
 def handle_get_world_state(req):
-    return GetStateResponse(state)
+    resp = GetStateResponse()
+    resp.gripper_closed = state.gripper_closed
+    resp.block_in_gripper = state.block_in_gripper
+    resp.stack = state.stack
+    resp.table = state.table
+    return resp
 
 if __name__ == '__main__':
     try:
