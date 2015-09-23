@@ -75,7 +75,7 @@ def handle_move_robot(req):
             success = False
 
     elif req.action == MOVE_OVER_BLOCK :
-        print "Moved over block " + req.target
+        print "Moved over block {0}".format(req.target)
     elif req.action == MOVE_OVER_TABLE :
         print "Moved over table"
     elif req.action == MOVE_TO_STACK_BOTTOM :
