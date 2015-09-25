@@ -1,65 +1,37 @@
 #!/usr/bin/env python
-# license removed for brevity
 import rospy
 from std_msgs.msg import String
 from zic_proj1.srv import MoveRobot, GetState
 from config import * 
 
-class UnrecoverableWorldStateException(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return self.value
-
-def is_stacked_ascending(block_stack):
-    n = rospy.get_param("num_blocks")
-    return block_stack[0] is 1 and all( [ block_stack[i] < block_stack[i+1] for i in range(len(block_stack))] ) and block_stack[n-1] is n
-
-def is_stacked_descending(block_stack):
-    n = rospy.get_param("num_blocks")
-    return block_stack[0] is n and all( [block_stack[i] > block_stack[i+1] for i in range(len(block_stack))]) and block_stack[n-1] is 1
-
-def is_scattered(table):
-    n = rospy.get_param("num_blocks")
-    return all( i in table for i in xrange(1,n+1))
-
 def scatter():
     rospy.loginfo("Beginning to scatter blocks")
     n = rospy.get_param("num_blocks")
-    rospy.loginfo("There are {0} blocks to deal with".format(n))
 
     while len(get_state().stack) > 0:
-        rospy.loginfo("\nBeginnning remove block subroutine")
+        current_block = get_state().stack[-1]
+        rospy.loginfo("\nBeginnning remove block subroutine for block {0}".format(current_block))
         rospy.loginfo("There are {0} blocks on the stack".format(len(get_state().stack)))
         rospy.loginfo("There are {0} blocks on the table".format(len(get_state().table)))
-        current_block = get_state().stack[-1]
         rospy.loginfo("Beginning to take block {0} off of the stack".format(current_block))
 
         rospy.loginfo("Beginning to move hand to block {0}".format(current_block))
-        if move_robot(MOVE_TO_BLOCK, current_block):
-            rospy.loginfo("Successfully moved hand to block {0}".format(current_block))
+        move_robot(MOVE_TO_BLOCK, current_block)
+        rospy.loginfo("Successfully moved hand to block {0}".format(current_block))
 
-            if move_robot(CLOSE_GRIPPER, current_block):
-                rospy.loginfo("Successfully closed gripper around block {0}".format(current_block))
+        rospy.loginfo("Beginning to close gripper around block {0}".format(current_block))
+        move_robot(CLOSE_GRIPPER, current_block)
+        rospy.loginfo("Successfully closed gripper around block {0}".format(current_block))
 
-                if move_robot(MOVE_OVER_TABLE, current_block):
-                    rospy.loginfo("Successfully moved gripper over table position for block {0}".format(current_block))
+        rospy.loginfo("Begining to move gripper over table position for block {0}".format(current_block))
+        move_robot(MOVE_OVER_TABLE, current_block)
+        rospy.loginfo("Successfully moved gripper over table position for block {0}".format(current_block)
 
-                    if move_robot(OPEN_GRIPPER, 0):
-                        rospy.loginfo("Successfully deposited block {0} at its position on table.\n".format(current_block))
-                    else:
-                        rospy.logerr("Failed to let go of block {0}.".format(current_block))
-                        raise UnrecoverableWorldStateException("Dislodged block {0} on table".format(current_block))
-                else:
-                    rospy.logerr("Failed to move block {0} to its position on table".format(current_block))
-                    raise UnrecoverableWorldStateException("Dropped block on the way to table")
-            else:
-                rospy.logerr("Failed to close gripper around block {0}, retrying".format(current_block))
-        else:
-            rospy.logerr("Failed to move hand to block {0}, retrying".format(current_block))
-
-    rospy.loginfo("Successfully scattered blocks.\n\n")
-    return True
+        rospy.loginfo("Beginning to open gripper to release block {0} onto table.".format(current_block))
+        move_robot(OPEN_GRIPPER, 0)
+        rospy.loginfo("Successfully deposited block {0} at its position on table".format(current_block))
+    
+    rospy.loginfo("\nSuccessfully scattered blocks.\n\n")
 
 def stack_ascending():
     n = rospy.get_param("num_blocks")
@@ -71,47 +43,36 @@ def stack_ascending():
     elif not is_scattered(get_state().table):
         rospy.loginfo("Blocks aren't scattered, beginning to scatter.\n")
         scatter()
-
-    rospy.loginfo("Blocks should be scattered")
+        rospy.loginfo("Successfully called Scatter subroutine, continuing to stack ascending.")
 
     for i in range(1,n+1):
+        rospy.loginfo("\nBeginning Stack Subroutine for block {0}".format(i))
         rospy.loginfo("Beginning to put block {0} on the stack".format(i))
-        
-        rospy.loginfo("{0} is the index we're going to look up".format(i-1))
-        rospy.loginfo("This is the stack: {0}".format(get_state().stack))
-        rospy.loginfo("Beginning to move hand to block {0}".format(i))
-        if move_robot(MOVE_TO_BLOCK, i):
-            rospy.loginfo("Successfully moved to block {0}".format(i))
 
-            if move_robot(CLOSE_GRIPPER, i):
-                rospy.loginfo("Successfully closed gripper around block {0}".format(i))
-                if i == 1:
-    		    action, target = MOVE_TO_STACK_BOTTOM, 1
-                    rospy.loginfo("Determined that there are no blocks in current stack, moving to base of stack")
-                else:
-                    action, target = MOVE_OVER_BLOCK, (i-1)
-                    rospy.loginfo("Determined that highest block currently in stack is {0}, moving over it".format(i-1))
-                if move_robot(action, target):
-                    rospy.loginfo("Successfully moved over stack")
-                    if move_robot(OPEN_GRIPPER, i):
-                        rospy.loginfo("Successfully deposited block {0} on stack.\n".format(i))
-                    else:
-                        rospy.logerr("Failed to place block on stack.")
-                else:
-                    rospy.logerr("Failed to move over stack.")
-                    rospy.loginfo("Attempting to place block back on table")
-                    if move_robot(MOVE_OVER_TABLE, i):
-                        rospy.loginfo("Moved block back on table, retrying")
-                    else:
-                        rospy.logerr("Failed to reset block to table, exiting")
-                        raise UnrecoverableWorldStateException("Failed to place block on stack and failed to move back to table, blocks in unknown configuration")
-            else:
-                rospy.logerr("Failed to close hand around block {0}".format(i))
+        rospy.loginfo("Beginning to move to block {0}".format(i))
+        move_robot(MOVE_TO_BLOCK, i)
+        rospy.loginfo("Moved to block {0}".format(i))
+
+        rospy.loginfo("Beginning to close gripper around block {0}".format(i))
+        move_robot(CLOSE_GRIPPER, i)
+        rospy.loginfo("Closed gripper around block {0}".format(i))
+
+        if i is 1:
+            rospy.loginfo("Moving block {0} to base of stack".format(i))
+            move_robot(MOVE_TO_STACK_BOTTOM, 1)
+            rospy.loginfo("Moved block {0} to base of stack".format(i))
         else:
-            rospy.logerr("Failed to move to block {0}".format(i))
+            rospy.loginfo("Moving block {0} above block {1}, on top of stack".format(i, i-1))
+            move_robot(MOVE_OVER_BLOCK, i-1)
+            rospy.loginfo("Moved block {0} over block {1}, block {0} is on top of stack".format(i,i-1))
+        
+        rospy.loginfo("Releasing gripper around block {0}".format(i))
+        move_robot(OPEN_GRIPPER, i-1)
+        rospy.loginfo("Released block {0} from gripper".format(i))
+    
+    rospy.loginfo("\nSuccessfully stacked blocks ascending.\n\n")
 
-
-def stack_descending():
+def stack_ascending():
     n = rospy.get_param("num_blocks")
     rospy.loginfo("Beginning to stack blocks descending")
 
@@ -121,68 +82,56 @@ def stack_descending():
     elif not is_scattered(get_state().table):
         rospy.loginfo("Blocks aren't scattered, beginning to scatter.\n")
         scatter()
-
-    rospy.loginfo("Blocks should be scattered")
+        rospy.loginfo("Successfully called Scatter subroutine, continuing to stack descending.")
 
     for i in range(n, 0, -1):
+        rospy.loginfo("\nBeginning Stack Subroutine for block {0}".format(i))
         rospy.loginfo("Beginning to put block {0} on the stack".format(i))
-        
-        rospy.loginfo("{0} is the index we're going to look up".format(i-1))
-        rospy.loginfo("This is the stack: {0}".format(get_state().stack))
-        rospy.loginfo("Beginning to move hand to block {0}".format(i))
-        if move_robot(MOVE_TO_BLOCK, i):
-            rospy.loginfo("Successfully moved to block {0}".format(i))
 
-            if move_robot(CLOSE_GRIPPER, i):
-                rospy.loginfo("Successfully closed gripper around block {0}".format(i))
-                if i == n:
-    		    action, target = MOVE_TO_STACK_BOTTOM, n
-                    rospy.loginfo("Determined that there are no blocks in current stack, moving to base of stack")
-                else:
-                    action, target = MOVE_OVER_BLOCK, (i+1)
-                    rospy.loginfo("Determined that highest block currently in stack is {0}, moving over it".format(i-1))
-                if move_robot(action, target):
-                    rospy.loginfo("Successfully moved over stack")
-                    if move_robot(OPEN_GRIPPER, i):
-                        rospy.loginfo("Successfully deposited block {0} on stack.\n".format(i))
-                    else:
-                        rospy.logerr("Failed to place block on stack.")
-                else:
-                    rospy.logerr("Failed to move over stack.")
-                    rospy.loginfo("Attempting to place block back on table")
-                    if move_robot(MOVE_OVER_TABLE, i):
-                        rospy.loginfo("Moved block back on table, retrying")
-                    else:
-                        rospy.logerr("Failed to reset block to table, exiting")
-                        raise UnrecoverableWorldStateException("Failed to place block on stack and failed to move back to table, blocks in unknown configuration")
-            else:
-                rospy.logerr("Failed to close hand around block {0}".format(i))
+        rospy.loginfo("Beginning to move to block {0}".format(i))
+        move_robot(MOVE_TO_BLOCK, i)
+        rospy.loginfo("Moved to block {0}".format(i))
+
+        rospy.loginfo("Beginning to close gripper around block {0}".format(i))
+        move_robot(CLOSE_GRIPPER, i)
+        rospy.loginfo("Closed gripper around block {0}".format(i))
+
+        if i is n:
+            rospy.loginfo("Moving block {0} to base of stack".format(i))
+            move_robot(MOVE_TO_STACK_BOTTOM, n)
+            rospy.loginfo("Moved block {0} to base of stack".format(i))
         else:
-            rospy.logerr("Failed to move to block {0}".format(i))
+            rospy.loginfo("Moving block {0} above block {1}, on top of stack".format(i, i+1))
+            move_robot(MOVE_OVER_BLOCK, i+1)
+            rospy.loginfo("Moved block {0} over block {1}, block {0} is on top of stack".format(i,i+1))
+        
+        rospy.loginfo("Releasing gripper around block {0}".format(i))
+        move_robot(OPEN_GRIPPER, i+1)
+        rospy.loginfo("Released block {0} from gripper".format(i))
+    
+    rospy.loginfo("\nSuccessfully stacked blocks descending.\n\n")
 
 
 def respond_to_command(command):
     rospy.loginfo("Recieved Command.")
-    try:
-        if command == String("scatter"):
-            rospy.loginfo("Command is \"scatter\"")
-            scatter()
-        elif command == String("stack_ascending"):
-            rospy.loginfo("Command is \"stack_ascending\"")
-            stack_ascending()
-        elif command == String("stack_descending"):
-            rospy.loginfo("Command is \"stack_descending\"")
-            stack_descending()
-        else:
-             rospy.logerr("Recieved invalid command: {0}".format(command))
-             return False
-    except UnrecoverableWorldStateException as e:
-        rospy.logerr("Command failed due to reason:\n {0}".format(e.value))
-        return False
-    return True
+    if command == String("scatter"):
+        rospy.loginfo("Command is \"scatter\"")
+        scatter()
+        rospy.loginfo("Executed command \"scatter\"")
+    elif command == String("stack_ascending"):
+        rospy.loginfo("Command is \"stack_ascending\"")
+        stack_ascending()
+        rospy.loginfo("Executed command \"stack_ascending\"")
+    elif command == String("stack_descending"):
+        rospy.loginfo("Command is \"stack_descending\"")
+        stack_descending()
+        rospy.loginfo("Executed command \"stack_descending\"")
+    else:
+        rospy.logerr("Recieved invalid command: {0}".format(command))
 
 def listener():
     # Initialize node.  This name should be unique, so it is not anonymous
+    rospy.loginfo("Initializing node Controller")
     rospy.init_node('controller')
     rospy.loginfo("Initialized node Controller")
 
@@ -218,9 +167,6 @@ def listener():
 
     except rospy.ServiceException, e:
         rospy.logerr("Service Call Failed")
-
-
-
 
 
 if __name__ == '__main__':
