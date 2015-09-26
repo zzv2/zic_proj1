@@ -1,4 +1,4 @@
-#!/usr/in/env python
+#!/usr/bin/env python
 # license removed for brevity
 #from beginner_tutorials.srv import * TODO need to replace
 import rospy
