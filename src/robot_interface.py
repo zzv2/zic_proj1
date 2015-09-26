@@ -85,6 +85,12 @@ def handle_move_robot(req):
 
     return MoveRobotResponse(success)
 
+def pick_and_place(source, destination):
+    """ Routine is a stub, implemented for part 2(b) """
+    pass
+
+
+
 def handle_get_world_state(req):
     resp = GetStateResponse()
     resp.gripper_closed = state.gripper_closed
