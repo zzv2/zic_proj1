@@ -54,14 +54,50 @@ def robot_interface():
 
     print "Ready to move robot."
 
+    rospy.loginfo("Assembling Initial State from Configuration Variables")
     config = rospy.get_param('configuration')
-    num_blocks = rospy.get_param("num_blocks")
-
+    n = rospy.get_param("num_blocks")
+    r = rospy.get_param("block_radius")
+    
+    if environment == "simulator" or environment == "robot":
+        state.x = [ endpoint_pose['position'].x 
+    
     state.gripper_closed = False
     state.block_in_gripper = 0
-    state.stack = range(1, num_blocks+1)
+    if config == "stacked_ascending" :
+        state.stack = range(1, n+1)
+        x = range(1, n+1)
+        y = range(1, n+1)
+        z = range(1, n+1)
+        i = range(1, n+1)
+        j = range(1, n+1)
+        k = range(1, n+1)
+        w = range(1, n+1)
+        for l in range(1, n+1):
+            x[l-1] == 0.0
+            y[l-1] == 0.0
+            z[l-1] == r + 2*(l-1)*r
+            i[l-1] == 0.0
+            j[l-1] == 0.0
+            k[l-1] == 0.0
+            w[l-1] == 1.0
     if config == "stacked_descending" :
-        state.stack.reverse()
+        state.stack = range(n,0,-1)
+        x = range(n, 0, -1)
+        y = range(n, 0, -1)
+        z = range(n, 0, -1)
+        i = range(n, 0, -1)
+        j = range(n, 0, -1)
+        k = range(n, 0, -1)
+        w = range(n, 0, -1)
+        for l in range(1, n+1):
+            x[l-1] == 0.0
+            y[l-1] == 0.0
+            z[l-1] == r + 2*(l-1)*r
+            i[l-1] == 0.0
+            j[l-1] == 0.0
+            k[l-1] == 0.0
+            w[l-1] == 1.0
     state.table = []
 
     rospy.loginfo("configuration: %s",config)
