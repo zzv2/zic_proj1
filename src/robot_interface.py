@@ -77,13 +77,19 @@ def robot_interface():
     rospy.spin()
 
 def handle_move_robot(req):
-
+    environment = rospy.get_param("environment")
     success = True
 
     if req.action == OPEN_GRIPPER : #CHRIS  we are using the target as the destination for this block
         #in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
         #Move_over_block
-        print "opened gripper"
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Beginning to open gripper")
+            left_gripper.open()
+            rospy.loginfo("Opened Gripper")
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to open gripper.")
+        
         if req.target == 0 : #putting block on table
             state.table.append(state.block_in_gripper)
             print "Deleting {0}".format(state.stack.index(state.block_in_gripper))
@@ -91,18 +97,20 @@ def handle_move_robot(req):
         else : #appending to stack
             state.stack.append(state.block_in_gripper)
             del state.table[state.table.index(state.block_in_gripper)]
+        
+        
         state.block_in_gripper = 0
         state.gripper_closed = False
 
-        rospy.loginfo("Beginning to open gripper")
-        left_gripper.open()
-        rospy.loginfo("Opened Gripper")
 
     elif req.action == CLOSE_GRIPPER :
 
-        rospy.loginfo("Beginning to close Gripper")
-        left_gripper.close()
-        rospy.loginfo("Closed Gripper")
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Beginning to close Gripper")
+            left_gripper.close()
+            rospy.loginfo("Closed Gripper")
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to close gripper")
 
         state.gripper_closed = True
         state.block_in_gripper = req.target
