@@ -46,6 +46,7 @@ def robot_interface():
         rospy.loginfo("Initializing service proxy for /SolvePositionIK...")
         global iksvc
         iksvc = rospy.ServiceProxy(ns, SolvePositionIK)
+        rospy.wait_for_service(ns, 5.0)
         rospy.loginfo("Initialized service proxy for /SolvePositionIK...")
     except rospy.ServiceException, e:
         rospy.logerr("Service Call Failed: {0}".format(e))
@@ -70,6 +71,7 @@ def robot_interface():
     while not rospy.is_shutdown():
         # publish state
         state_publisher.publish(state)
+	inverse_kinematics(.1, .1, .1)
         rospy.loginfo(state)
         broadcast_rate.sleep()
 
@@ -154,7 +156,7 @@ def inverse_kinematics(x, y, z) :
     ikreq = SolvePositionIKRequest()
 
     hdr = Header(stamp=rospy.Time.now(), frame_id='base')
-    goal_pose = {
+    poses = {
         'left' : PoseStamped(
             header = hdr,
             pose = Pose (
@@ -171,9 +173,11 @@ def inverse_kinematics(x, y, z) :
         ),
     }         
     #getting ik of pose
+     
     ikreq.pose_stamp.append(poses['left'])
 
     try :
+        ns = "ExternalTools/left/PositionKinematicsNode/IKService"
         rospy.wait_for_service(ns, 5.0)
         resp = iksvc(ikreq)
     except (rospy.ServiceException, rospy.ROSException), e:
