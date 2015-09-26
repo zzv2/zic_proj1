@@ -18,15 +18,21 @@ state = State()
 def robot_interface():
     rospy.init_node('robot_interface')
 
-    rospy.loginfo("Beginning to enable robot")
-    global baxter
-    baxter = RobotEnable()
-    rospy.loginfo("Enabled Robot")
-
-    rospy.loginfo("Beginning to initialize left gripper")
-    global left_gripper
-    left_gripper = Gripper('left')
-    rospy.loginfo("Left Gripper initialized")
+    environment = rospy.get_param("environment")
+    if environment is "simulator" or environment is "robot":
+        rospy.loginfo("Beginning to enable robot")
+        global baxter
+        baxter = RobotEnable()
+        rospy.loginfo("Enabled Robot")
+    
+        rospy.loginfo("Beginning to initialize left gripper")
+        global left_gripper
+        left_gripper = Gripper('left')
+        rospy.loginfo("Left Gripper initialized")
+    elif environment is "symbolic":
+        rospy.loginfo("Entering Symbolic Simulator")
+    else:
+        raise EnvironmentError("Invalid Environment variable")
 
     state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
     
