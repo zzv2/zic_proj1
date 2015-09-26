@@ -2,7 +2,7 @@
 	<param name="num_blocks" value="5" type="int"/>
 	<param name="configuration" value="stacked_descending" />
         <!-- environment can be "symbolic", "simulator", "robot" -->
-	<param name="environment" value="symbolic" />
+	<param name="environment" value="simulator" />
 
 	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen">
 	</node>
