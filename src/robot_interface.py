@@ -138,7 +138,7 @@ def handle_get_world_state(req):
 #takes position in base frame of where hand is to go
 #calculates ik and moves limb to that location
 #returns 1 if successful and 0 if invalid solution
-def inverse_kinematics(float x, float y, float z) :
+def inverse_kinematics(x, y, z) :
     # given x,y,z will call ik for this position with identity quaternion
     #in base frame
     ikreq = SolvePositionIKRequest()
