@@ -7,9 +7,9 @@ from zic_proj1.msg import State
 from zic_proj1.srv import *
 from config import *
 from geometry_msgs.msg import * # PoseStamped, quaternion, point, pose
-from baxter_core_msgs import * #(SolvePositionIK, SolvePositionIKRequest)
-
-from baxter_interface import RobotEnable, Gripper
+from baxter_core_msgs.msg import * #(SolvePositionIK, SolvePositionIKRequest)
+from baxter_core_msgs.srv import *
+from baxter_interface import *
 
 state = State()
 
@@ -17,9 +17,11 @@ state = State()
 
 def robot_interface():
     rospy.init_node('robot_interface')
+    rospy.loginfo("Initialized Robot Interface")
 
     environment = rospy.get_param("environment")
-    if environment is "simulator" or environment is "robot":
+    rospy.loginfo("Desired Environment is: {0}".format(environment))
+    if environment == "simulator" or environment == "robot":
         rospy.loginfo("Beginning to enable robot")
         global baxter
         baxter = RobotEnable()
@@ -29,7 +31,7 @@ def robot_interface():
         global left_gripper
         left_gripper = Gripper('left')
         rospy.loginfo("Left Gripper initialized")
-    elif environment is "symbolic":
+    elif environment == "symbolic":
         rospy.loginfo("Entering Symbolic Simulator")
     else:
         raise EnvironmentError("Invalid Environment variable")
