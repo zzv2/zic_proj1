@@ -13,7 +13,7 @@ state = State()
 #locations on table will be given by function in this file
 
 def robot_interface():
-    rospy.init_node('robot_interface', anonymous=True)
+    rospy.init_node('robot_interface')
 
     state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
     
