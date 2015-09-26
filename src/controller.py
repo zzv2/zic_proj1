@@ -166,7 +166,7 @@ def listener():
         rospy.spin()
 
     except rospy.ServiceException, e:
-        rospy.logerr("Service Call Failed")
+        rospy.logerr("Service Call Failed: {0}".format(e))
 
 
 if __name__ == '__main__':
