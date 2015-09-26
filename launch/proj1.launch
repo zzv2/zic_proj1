@@ -1,7 +1,8 @@
 <launch>
 	<param name="num_blocks" value="5" type="int"/>
 	<param name="configuration" value="stacked_descending" />
-	<param name="sim" value="false" />
+        <!-- environment can be "symbolic", "simulator", "robot" -->
+	<param name="environment" value="symbolic" />
 
 	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen">
 	</node>
