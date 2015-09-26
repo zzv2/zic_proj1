@@ -71,7 +71,7 @@ def robot_interface():
     while not rospy.is_shutdown():
         # publish state
         state_publisher.publish(state)
-	inverse_kinematics(.1, .1, .1)
+	inverse_kinematics(0.79, 0.51, 0.39)
         rospy.loginfo(state)
         broadcast_rate.sleep()
 
@@ -147,6 +147,9 @@ def handle_get_world_state(req):
     resp.table = state.table
     return resp
 
+def get_current_pose():
+	pass
+
 #takes position in base frame of where hand is to go
 #calculates ik and moves limb to that location
 #returns 1 if successful and 0 if invalid solution
@@ -165,10 +168,10 @@ def inverse_kinematics(x, y, z) :
                     y = y,
                     z = z,),
                 orientation = Quaternion(
-                    x = 0,
-                    y = 0,
-    	            z = 0,
-                    w = 1,),
+                    x = -0.366284955545,
+                    y = 0.916493748522,
+    	            z = -0.0877667326666,
+                    w = 0.134801857919,),
             ),
         ),
     }         
@@ -188,7 +191,7 @@ def inverse_kinematics(x, y, z) :
         limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
         print limb_joints
     else :
-        print "Invalid pose"
+        rospy.logerr("Invalid pose")
         return 0
     return 1
 
