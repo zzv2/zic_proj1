@@ -25,7 +25,7 @@ def scatter():
 
         rospy.loginfo("Begining to move gripper over table position for block {0}".format(current_block))
         move_robot(MOVE_OVER_TABLE, current_block)
-        rospy.loginfo("Successfully moved gripper over table position for block {0}".format(current_block)
+        rospy.loginfo("Successfully moved gripper over table position for block {0}".format(current_block))
 
         rospy.loginfo("Beginning to open gripper to release block {0} onto table.".format(current_block))
         move_robot(OPEN_GRIPPER, 0)

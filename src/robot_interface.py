@@ -7,12 +7,24 @@ from zic_proj1.msg import State
 from zic_proj1.srv import *
 from config import *
 
+from baxter_interface import RobotEnable, Gripper
+
 state = State()
 
 #locations on table will be given by function in this file
 
 def robot_interface():
     rospy.init_node('robot_interface')
+
+    rospy.loginfo("Beginning to enable robot")
+    global baxter
+    baxter = RobotEnable()
+    rospy.loginfo("Enabled Robot")
+
+    rospy.loginfo("Beginning to initialize left gripper")
+    global left_gripper
+    left_gripper = Gripper('left')
+    rospy.loginfo("Left Gripper initialized")
 
     state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
     
@@ -62,9 +74,16 @@ def handle_move_robot(req):
         state.block_in_gripper = 0
         state.gripper_closed = False
 
-        #Gripper.open ==> physical robot commands go here
+        rospy.loginfo("Beginning to open gripper")
+        left_gripper.open()
+        rospy.loginfo("Opened Gripper")
+
     elif req.action == CLOSE_GRIPPER :
-        print "closed gripper"
+
+        rospy.loginfo("Beginning to close Gripper")
+        left_gripper.close()
+        rospy.loginfo("Closed Gripper")
+
         state.gripper_closed = True
         state.block_in_gripper = req.target
 
