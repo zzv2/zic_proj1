@@ -2,10 +2,12 @@
 # license removed for brevity
 #from beginner_tutorials.srv import * TODO need to replace
 import rospy
-from std_msgs.msg import String
+from std_msgs.msg import * # String and header
 from zic_proj1.msg import State
 from zic_proj1.srv import *
 from config import *
+from geometry_msgs.msg import * # PoseStamped, quaternion, point, pose
+from baxter_core_msgs import * #(SolvePositionIK, SolvePositionIKRequest)
 
 from baxter_interface import RobotEnable, Gripper
 
@@ -30,6 +32,16 @@ def robot_interface():
     
     move_robot_service = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
     get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
+
+    ns = "ExternalTools/left/PositionKinematicsNode/IKService"
+    try :
+        rospy.loginfo("Initializing service proxy for /SolvePositionIK...")
+        global iksvc
+        iksvc = rospy.ServiceProxy(ns, SolvePositionIK)
+        rospy.loginfo("Initialized service proxy for /SolvePositionIK...")
+    except rospy.ServiceException, e:
+        rospy.logerr("Service Call Failed: {0}".format(e))
+        
 
     print "Ready to move robot."
 
@@ -116,6 +128,49 @@ def handle_get_world_state(req):
     resp.stack = state.stack
     resp.table = state.table
     return resp
+
+#takes position in base frame of where hand is to go
+#calculates ik and moves limb to that location
+#returns 1 if successful and 0 if invalid solution
+def inverse_kinematics(float x, float y, float z) :
+    # given x,y,z will call ik for this position with identity quaternion
+    #in base frame
+    ikreq = SolvePositionIKRequest()
+
+    hdr = Header(stamp=rospy.Time.now(), frame_id='base')
+    goal_pose = {
+        'left' : PoseStamped(
+            header = hdr,
+            pose = Pose (
+                position = Point(
+	            x = x,
+                    y = y,
+                    z = z,),
+                orientation = Quaternion(
+                    x = 0,
+                    y = 0,
+    	            z = 0,
+                    w = 1,),
+            ),
+        ),
+    }         
+    #getting ik of pose
+    ikreq.pose_stamp.append(poses['left'])
+
+    try :
+        rospy.wait_for_service(ns, 5.0)
+        resp = iksvc(ikreq)
+    except (rospy.ServiceException, rospy.ROSException), e:
+        rospy.logerr("Service call failed: %s" % (e,))
+        return 0
+    if (resp.isValid[0]):
+        print("SUCCESS - Valid Joint Solution Found:")
+        limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
+        print limb_joints
+    else :
+        print "Invalid pose"
+        return 0
+    return 1
 
 if __name__ == '__main__':
     try:
