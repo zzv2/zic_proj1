@@ -131,7 +131,7 @@ def respond_to_command(command):
 
 def listener():
     # Initialize node.  This name should be unique, so it is not anonymous
-    rospy.loginfo("Initializing node Controller")
+    #rospy.loginfo("Initializing node Controller")
     rospy.init_node('controller')
     rospy.loginfo("Initialized node Controller")
 

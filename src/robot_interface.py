@@ -12,6 +12,9 @@ from baxter_core_msgs.srv import *
 from baxter_interface import *
 
 state = State()
+hand_pose = Pose()
+initial_pose = Pose()
+count = 0
 
 #locations on table will be given by function in this file
 
@@ -37,6 +40,11 @@ def robot_interface():
         raise EnvironmentError("Invalid Environment variable")
 
     state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
+
+    #initialize endpoint state so that we will be notified of robot arm position
+    rospy.loginfo("Subscribing to topic /endpoint_state")
+    left_limb_subscriber = rospy.Subscriber("/robot/limb/left/endpoint_state", EndpointState, respondToEndpoint)
+    rospy.loginfo("Subscribed to topic /endpoint_state")
     
     move_robot_service = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
     get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
@@ -72,15 +80,31 @@ def robot_interface():
     while not rospy.is_shutdown():
         # publish state
         state_publisher.publish(state)
-	joint_solution = inverse_kinematics(0.79 + myx, 0.51, 0.39)
+	joint_solution = inverse_kinematics(hand_pose.position.x+.1, hand_pose.position.y, hand_pose.position.z)
 	print joint_solution
-	moveArm(joint_solution,'left')
+	if joint_solution != [] :
+	    moveArm(joint_solution,'left')
         rospy.loginfo(state)
+	rospy.loginfo(hand_pose)
+        rospy.loginfo(initial_pose)
         myx += .01
         broadcast_rate.sleep()
 
     
     rospy.spin()
+
+#updates our known location of hand
+#this will update 100 hz is this inefficient? 
+def respondToEndpoint(EndpointState) :
+    print hand_pose
+    hand_pose.position.x = EndpointState.pose.position.x
+    hand_pose.position.y = EndpointState.pose.position.y
+    hand_pose.position.z = EndpointState.pose.position.z
+    hand_pose.orientation.w = EndpointState.pose.orientation.w
+    hand_pose.orientation.x = EndpointState.pose.orientation.x
+    hand_pose.orientation.y = EndpointState.pose.orientation.y
+    hand_pose.orientation.z = EndpointState.pose.orientation.z
+    
 
 def handle_move_robot(req):
     environment = rospy.get_param("environment")
@@ -157,7 +181,7 @@ def get_current_pose():
 def moveArm (joint_solution, limb) :
     arm = Limb(limb)
     #while not rospy.is_shutdown():
-    arm.set_positions(joint_solution)
+    arm.move_to_joint_positions(joint_solution)
     rospy.sleep(0.01)
 
 #takes position in base frame of where hand is to go
@@ -177,11 +201,11 @@ def inverse_kinematics(x, y, z) :
 	            x = x,
                     y = y,
                     z = z,),
-                orientation = Quaternion(
-                    x = -0.366284955545,
-                    y = 0.916493748522,
-    	            z = -0.0877667326666,
-                    w = 0.134801857919,),
+                orientation = hand_pose.orientation#Quaternion(
+                    #x = hand_pose.orientation.x,
+                    #y = 0.649877042859,
+    	            #z = 0.228353077256,
+                    #w = 0.685241671126,),
             ),
         ),
     }         
