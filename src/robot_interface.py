@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/in/env python
 # license removed for brevity
 #from beginner_tutorials.srv import * TODO need to replace
 import rospy
@@ -13,37 +13,37 @@ state = State()
 #locations on table will be given by function in this file
 
 def robot_interface():
-        rospy.init_node('robot_interface', anonymous=True)
+    rospy.init_node('robot_interface', anonymous=True)
 
-        state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
-        
-        move_robot_service = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
-        get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
+    state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
+    
+    move_robot_service = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
+    get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
 
-        print "Ready to move robot."
+    print "Ready to move robot."
 
-        config = rospy.get_param('configuration')
-        num_blocks = rospy.get_param("num_blocks")
+    config = rospy.get_param('configuration')
+    num_blocks = rospy.get_param("num_blocks")
 
-        state.gripper_closed = False
-        state.block_in_gripper = 0
-        state.stack = range(1, num_blocks+1)
-        if config == "stacked_descending" :
-            state.stack.reverse()
-        state.table = []
+    state.gripper_closed = False
+    state.block_in_gripper = 0
+    state.stack = range(1, num_blocks+1)
+    if config == "stacked_descending" :
+        state.stack.reverse()
+    state.table = []
 
-        rospy.loginfo("configuration: %s",config)
-        rospy.loginfo("num_blocks: %d",num_blocks)
+    rospy.loginfo("configuration: %s",config)
+    rospy.loginfo("num_blocks: %d",num_blocks)
 
-        broadcast_rate = rospy.Rate(1) # 1 hz
-        while not rospy.is_shutdown():
-            # publish state
-            state_publisher.publish(state)
-            rospy.loginfo(state)
-            broadcast_rate.sleep()
+    broadcast_rate = rospy.Rate(1) # 1 hz
+    while not rospy.is_shutdown():
+        # publish state
+        state_publisher.publish(state)
+        rospy.loginfo(state)
+        broadcast_rate.sleep()
 
-        
-        rospy.spin()
+    
+    rospy.spin()
 
 def handle_move_robot(req):
 
