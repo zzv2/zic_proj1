@@ -12,9 +12,19 @@ from baxter_core_msgs.srv import *
 from baxter_interface import *
 
 state = State()
-hand_pose = Pose()
+
+hand_pose = Pose() #updated at 100 hz
 initial_pose = Pose()
-count = 0
+
+block_size = .04445 #meters, 1.75 inches
+num_blocks = 0
+
+stack_x = 0
+stack_y = 0
+stack_z = 0 #num_blocks * block_size + table_z
+table_z = 1 # <---find this
+
+block_poses = [] #positioned at initialization, block 1 at index 0, block 2 at index 1 etc
 
 #locations on table will be given by function in this file
 
@@ -63,6 +73,7 @@ def robot_interface():
     print "Ready to move robot."
 
     config = rospy.get_param('configuration')
+    global num_blocks
     num_blocks = rospy.get_param("num_blocks")
 
     state.gripper_closed = False
@@ -80,13 +91,13 @@ def robot_interface():
     while not rospy.is_shutdown():
         # publish state
         state_publisher.publish(state)
-	joint_solution = inverse_kinematics(hand_pose.position.x+.1, hand_pose.position.y, hand_pose.position.z)
-	print joint_solution
-	if joint_solution != [] :
-	    moveArm(joint_solution,'left')
-        rospy.loginfo(state)
-	rospy.loginfo(hand_pose)
-        rospy.loginfo(initial_pose)
+	    #joint_solution = inverse_kinematics(hand_pose.position.x+.1, hand_pose.position.y, hand_pose.position.z)
+	    #print joint_solution
+	    #if joint_solution != [] :
+	    #moveArm(joint_solution,'left')
+        #rospy.loginfo(state)
+        #rospy.loginfo("hand pose: ",hand_pose)
+        #rospy.loginfo("initial pose: ",initial_pose)
         myx += .01
         broadcast_rate.sleep()
 
@@ -96,7 +107,7 @@ def robot_interface():
 #updates our known location of hand
 #this will update 100 hz is this inefficient? 
 def respondToEndpoint(EndpointState) :
-    print hand_pose
+    global hand_pose #can change to deep copy
     hand_pose.position.x = EndpointState.pose.position.x
     hand_pose.position.y = EndpointState.pose.position.y
     hand_pose.position.z = EndpointState.pose.position.z
@@ -104,7 +115,30 @@ def respondToEndpoint(EndpointState) :
     hand_pose.orientation.x = EndpointState.pose.orientation.x
     hand_pose.orientation.y = EndpointState.pose.orientation.y
     hand_pose.orientation.z = EndpointState.pose.orientation.z
-    
+
+    global initial_pose
+    if initial_pose == Pose() :
+        rospy.loginfo("Initializing block positions")
+        initial_pose = hand_pose
+        #start of robot, save position and set up some positionings
+        global num_blocks
+        global block_poses
+        global block_size
+        for i in range(0,num_blocks) :
+            bp = Pose()
+            bp.position.x = EndpointState.pose.position.x
+            bp.position.y = EndpointState.pose.position.y
+            bp.position.z = EndpointState.pose.position.z - i * block_size
+            bp.orientation.w = EndpointState.pose.orientation.w
+            bp.orientation.x = EndpointState.pose.orientation.x
+            bp.orientation.y = EndpointState.pose.orientation.y
+            bp.orientation.z = EndpointState.pose.orientation.z
+            block_poses.append(bp)
+        if rospy.get_param('configuration') == "stack_ascending" :
+            block_poses.reverse()
+        rospy.loginfo("Initialized block positions")
+        print block_poses
+
 
 def handle_move_robot(req):
     environment = rospy.get_param("environment")
@@ -152,6 +186,7 @@ def handle_move_robot(req):
 
     elif req.action == MOVE_OVER_BLOCK :
         print "Moved over block {0}".format(req.target)
+        
     elif req.action == MOVE_OVER_TABLE :
         print "Moved over table"
     elif req.action == MOVE_TO_STACK_BOTTOM :
@@ -187,7 +222,7 @@ def moveArm (joint_solution, limb) :
 #takes position in base frame of where hand is to go
 #calculates ik and moves limb to that location
 #returns 1 if successful and 0 if invalid solution
-def inverse_kinematics(x, y, z) :
+def inverse_kinematics(position, orientation) :
     # given x,y,z will call ik for this position with identity quaternion
     #in base frame
     ikreq = SolvePositionIKRequest()
@@ -197,11 +232,11 @@ def inverse_kinematics(x, y, z) :
         'left' : PoseStamped(
             header = hdr,
             pose = Pose (
-                position = Point(
-	            x = x,
-                    y = y,
-                    z = z,),
-                orientation = hand_pose.orientation#Quaternion(
+                position = position,#Point(
+	                #x = x,
+                    #y = y,
+                    #z = z,),
+                orientation = orientation,#Quaternion(
                     #x = hand_pose.orientation.x,
                     #y = 0.649877042859,
     	            #z = 0.228353077256,
