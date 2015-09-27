@@ -10,6 +10,7 @@ from geometry_msgs.msg import * # PoseStamped, quaternion, point, pose
 from baxter_core_msgs.msg import * #(SolvePositionIK, SolvePositionIKRequest)
 from baxter_core_msgs.srv import *
 from baxter_interface import *
+from copy import deepcopy
 
 state = State()
 
@@ -19,12 +20,11 @@ initial_pose = Pose()
 block_size = .04445 #meters, 1.75 inches
 num_blocks = 0
 
-stack_x = 0
-stack_y = 0
-stack_z = 0 #num_blocks * block_size + table_z
 table_z = 1 # <---find this
 
 block_poses = [] #positioned at initialization, block 1 at index 0, block 2 at index 1 etc
+
+MOVE_WAIT = 2.5
 
 #locations on table will be given by function in this file
 
@@ -87,7 +87,7 @@ def robot_interface():
     rospy.loginfo("num_blocks: %d",num_blocks)
 
     broadcast_rate = rospy.Rate(1) # 1 hz
-    myx = 0
+    HomePose()
     while not rospy.is_shutdown():
         # publish state
         state_publisher.publish(state)
@@ -98,23 +98,33 @@ def robot_interface():
         #rospy.loginfo(state)
         #rospy.loginfo("hand pose: ",hand_pose)
         #rospy.loginfo("initial pose: ",initial_pose)
-        myx += .01
         broadcast_rate.sleep()
 
     
     rospy.spin()
 
+def HomePose() :
+    rospy.loginfo("Going to Home Pose")
+    homepose = Pose()
+    homepose.position = Point(0.572578886689,0.181184911298,0.146191403844)
+    homepose.orientation = Quaternion(0.140770659119,0.989645234506,0.0116543447684,0.0254972076605)
+    success = MoveToPose(homepose, False)
+    rospy.loginfo("Got to Home Pose : %r", success)
+
+
+
 #updates our known location of hand
 #this will update 100 hz is this inefficient? 
 def respondToEndpoint(EndpointState) :
     global hand_pose #can change to deep copy
-    hand_pose.position.x = EndpointState.pose.position.x
-    hand_pose.position.y = EndpointState.pose.position.y
-    hand_pose.position.z = EndpointState.pose.position.z
-    hand_pose.orientation.w = EndpointState.pose.orientation.w
-    hand_pose.orientation.x = EndpointState.pose.orientation.x
-    hand_pose.orientation.y = EndpointState.pose.orientation.y
-    hand_pose.orientation.z = EndpointState.pose.orientation.z
+    hand_pose = deepcopy(EndpointState.pose)
+    #hand_pose.position.x = EndpointState.pose.position.x
+    #hand_pose.position.y = EndpointState.pose.position.y
+    #hand_pose.position.z = EndpointState.pose.position.z
+    #hand_pose.orientation.w = EndpointState.pose.orientation.w
+    #hand_pose.orientation.x = EndpointState.pose.orientation.x
+    #hand_pose.orientation.y = EndpointState.pose.orientation.y
+    #hand_pose.orientation.z = EndpointState.pose.orientation.z
 
     global initial_pose
     if initial_pose == Pose() :
@@ -124,6 +134,9 @@ def respondToEndpoint(EndpointState) :
         global num_blocks
         global block_poses
         global block_size
+
+        global table_z
+        table_z = hand_pose.position.z - ((num_blocks -1) * block_size)
         for i in range(0,num_blocks) :
             bp = Pose()
             bp.position.x = EndpointState.pose.position.x
@@ -144,6 +157,9 @@ def handle_move_robot(req):
     environment = rospy.get_param("environment")
     success = True
 
+    global block_poses
+    global block_size
+    global table_z
     if req.action == OPEN_GRIPPER : #CHRIS  we are using the target as the destination for this block
         #in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
         #Move_over_block
@@ -153,16 +169,19 @@ def handle_move_robot(req):
             rospy.loginfo("Opened Gripper")
         elif environment == "symbolic":
             rospy.loginfo("Pretending to open gripper.")
-        
-        if req.target == 0 : #putting block on table
-            state.table.append(state.block_in_gripper)
-            print "Deleting {0}".format(state.stack.index(state.block_in_gripper))
-            del state.stack[state.stack.index(state.block_in_gripper)]
-        else : #appending to stack
-            state.stack.append(state.block_in_gripper)
-            del state.table[state.table.index(state.block_in_gripper)]
-        
-        
+
+        if state.block_in_gripper > 0 :
+            if req.target == 0 : #putting block on table
+                state.table.append(state.block_in_gripper)
+                print "Deleting {0}".format(state.stack.index(state.block_in_gripper))
+                del state.stack[state.stack.index(state.block_in_gripper)]
+                
+            else : #appending to stack
+                state.stack.append(state.block_in_gripper)
+                del state.table[state.table.index(state.block_in_gripper)]
+            
+            block_poses[(state.block_in_gripper - 1)] = deepcopy(hand_pose)
+
         state.block_in_gripper = 0
         state.gripper_closed = False
 
@@ -180,17 +199,45 @@ def handle_move_robot(req):
         state.block_in_gripper = req.target
 
     elif req.action == MOVE_TO_BLOCK :
-        print "Moved to block {0}".format(req.target)
+        print "Moving to block {0}".format(req.target)
         if state.block_in_gripper > 0 or state.gripper_closed:
             success = False
+            rospy.loginfo("Failed because block in gripper or gripper closed")
+        else :
+            rospy.loginfo("Trying to Move to Block %d",req.target)
+            success = MoveToPose(block_poses[(req.target-1)])
+            print "Moved to Block is : %r" % success
+
+        
 
     elif req.action == MOVE_OVER_BLOCK :
-        print "Moved over block {0}".format(req.target)
+        rospy.loginfo("Trying to Move OVER Block %d",req.target)
+        temppose = deepcopy(block_poses[(req.target-1)])
+        temppose.position.z += block_size
+        success = MoveToPose(temppose)
+        print "Moved OVER Block is : %r" % success
         
     elif req.action == MOVE_OVER_TABLE :
-        print "Moved over table"
+        print "Moving over table"
+        delY = (1+((req.target - 1) % 5)) * 2 * block_size
+        print "DELY : %d", delY
+        if initial_pose.position.y > 0 :
+            delY = -delY
+        delX = (req.target - 1)/5 * 2 * block_size
+        
+        p = deepcopy(initial_pose)
+        p.position.x += delX
+        p.position.y += delY
+        p.position.z = table_z
+        success = MoveToPose(p)
+        print "Moved OVER Table : %r" % success
+        
     elif req.action == MOVE_TO_STACK_BOTTOM :
-        print "Moved to stack bottom"
+        rospy.loginfo("Moving to stack bottom")
+        p = deepcopy(initial_pose)
+        p.position.z = table_z
+        success = MoveToPose(p)
+        print "Moved To Stack Bottom : %r" % success
     else :
         print "invalid action"
 
@@ -201,7 +248,6 @@ def pick_and_place(source, destination):
     pass
 
 
-
 def handle_get_world_state(req):
     resp = GetStateResponse()
     resp.gripper_closed = state.gripper_closed
@@ -210,8 +256,36 @@ def handle_get_world_state(req):
     resp.table = state.table
     return resp
 
-def get_current_pose():
-    pass
+def MoveToPose (pose, intermediate = True) :
+    if intermediate :
+        b = MoveToIntermediatePose(pose)
+        if not b :
+            return False
+
+    global MOVE_WAIT
+    joint_solution = inverse_kinematics(pose)
+    if joint_solution != [] :
+        moveArm(joint_solution, 'left')
+        rospy.sleep(MOVE_WAIT) #just a made up value atm
+        return True
+    else :
+        rospy.logerr("FAILED MoveToPose")
+        return False
+
+def MoveToIntermediatePose(pose) :
+    global MOVE_WAIT
+    interpose = deepcopy(pose)
+    global block_size
+    global initial_pose
+    interpose.position.z = initial_pose.position.z + 2 * block_size
+    joint_solution = inverse_kinematics(interpose)
+    if joint_solution != [] :
+        moveArm(joint_solution, 'left')
+        rospy.sleep(MOVE_WAIT) #just a made up value atm
+        return True
+    else :
+        rospy.logerr("FAILED MoveToIntermediatePose")
+        return False
 
 def moveArm (joint_solution, limb) :
     arm = Limb(limb)
@@ -222,7 +296,7 @@ def moveArm (joint_solution, limb) :
 #takes position in base frame of where hand is to go
 #calculates ik and moves limb to that location
 #returns 1 if successful and 0 if invalid solution
-def inverse_kinematics(position, orientation) :
+def inverse_kinematics(ourpose) :
     # given x,y,z will call ik for this position with identity quaternion
     #in base frame
     ikreq = SolvePositionIKRequest()
@@ -231,17 +305,7 @@ def inverse_kinematics(position, orientation) :
     poses = {
         'left' : PoseStamped(
             header = hdr,
-            pose = Pose (
-                position = position,#Point(
-	                #x = x,
-                    #y = y,
-                    #z = z,),
-                orientation = orientation,#Quaternion(
-                    #x = hand_pose.orientation.x,
-                    #y = 0.649877042859,
-    	            #z = 0.228353077256,
-                    #w = 0.685241671126,),
-            ),
+            pose = ourpose
         ),
     }         
     #getting ik of pose
@@ -254,16 +318,15 @@ def inverse_kinematics(position, orientation) :
         resp = iksvc(ikreq)
     except (rospy.ServiceException, rospy.ROSException), e:
         rospy.logerr("Service call failed: %s" % (e,))
-        return 0
+        return []
     if (resp.isValid[0]):
         print("SUCCESS - Valid Joint Solution Found:")
         limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
         #print limb_joints
-	return limb_joints
+        return limb_joints
     else :
         rospy.logerr("Invalid pose")
         return []
-    return 1
 
 if __name__ == '__main__':
     try:
