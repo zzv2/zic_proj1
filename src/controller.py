@@ -28,7 +28,7 @@ def scatter():
         rospy.loginfo("Successfully moved gripper over table position for block {0}".format(current_block))
 
         rospy.loginfo("Beginning to open gripper to release block {0} onto table.".format(current_block))
-        move_robot(OPEN_GRIPPER, 0)
+        move_robot(OPEN_GRIPPER, -1)
         rospy.loginfo("Successfully deposited block {0} at its position on table".format(current_block))
     
     rospy.loginfo("\nSuccessfully scattered blocks.\n\n")
@@ -40,7 +40,7 @@ def stack_ascending():
     if sorted(get_state().stack) is get_state().stack:
         rospy.loginfo("Blocks already stacked ascending.\n")
         return True
-    elif not is_scattered(get_state().table):
+    elif len(get_state().stack) > 0:
         rospy.loginfo("Blocks aren't scattered, beginning to scatter.\n")
         scatter()
         rospy.loginfo("Successfully called Scatter subroutine, continuing to stack ascending.")
@@ -72,14 +72,14 @@ def stack_ascending():
     
     rospy.loginfo("\nSuccessfully stacked blocks ascending.\n\n")
 
-def stack_ascending():
+def stack_descending():
     n = rospy.get_param("num_blocks")
     rospy.loginfo("Beginning to stack blocks descending")
 
     if list(reversed(sorted(get_state().stack))) is get_state().stack:
         rospy.loginfo("Blocks already stacked ascending.\n")
         return True
-    elif not is_scattered(get_state().table):
+    elif len(get_state().stack) > 0:
         rospy.loginfo("Blocks aren't scattered, beginning to scatter.\n")
         scatter()
         rospy.loginfo("Successfully called Scatter subroutine, continuing to stack descending.")

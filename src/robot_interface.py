@@ -24,7 +24,7 @@ table_z = 1 # <---find this
 
 block_poses = [] #positioned at initialization, block 1 at index 0, block 2 at index 1 etc
 
-MOVE_WAIT = 2.5
+MOVE_WAIT = .01
 
 #locations on table will be given by function in this file
 
@@ -138,14 +138,8 @@ def respondToEndpoint(EndpointState) :
         global table_z
         table_z = hand_pose.position.z - ((num_blocks -1) * block_size)
         for i in range(0,num_blocks) :
-            bp = Pose()
-            bp.position.x = EndpointState.pose.position.x
-            bp.position.y = EndpointState.pose.position.y
+            bp = deepcopy(EndpointState.pose)
             bp.position.z = EndpointState.pose.position.z - i * block_size
-            bp.orientation.w = EndpointState.pose.orientation.w
-            bp.orientation.x = EndpointState.pose.orientation.x
-            bp.orientation.y = EndpointState.pose.orientation.y
-            bp.orientation.z = EndpointState.pose.orientation.z
             block_poses.append(bp)
         if rospy.get_param('configuration') == "stack_ascending" :
             block_poses.reverse()
@@ -158,6 +152,7 @@ def handle_move_robot(req):
     success = True
 
     global block_poses
+    global hand_pose
     global block_size
     global table_z
     if req.action == OPEN_GRIPPER : #CHRIS  we are using the target as the destination for this block
@@ -171,16 +166,16 @@ def handle_move_robot(req):
             rospy.loginfo("Pretending to open gripper.")
 
         if state.block_in_gripper > 0 :
-            if req.target == 0 : #putting block on table
+            if req.target == -1 : #putting block on table
                 state.table.append(state.block_in_gripper)
                 print "Deleting {0}".format(state.stack.index(state.block_in_gripper))
                 del state.stack[state.stack.index(state.block_in_gripper)]
-                
             else : #appending to stack
                 state.stack.append(state.block_in_gripper)
                 del state.table[state.table.index(state.block_in_gripper)]
             
             block_poses[(state.block_in_gripper - 1)] = deepcopy(hand_pose)
+            
 
         state.block_in_gripper = 0
         state.gripper_closed = False
@@ -199,45 +194,63 @@ def handle_move_robot(req):
         state.block_in_gripper = req.target
 
     elif req.action == MOVE_TO_BLOCK :
-        print "Moving to block {0}".format(req.target)
-        if state.block_in_gripper > 0 or state.gripper_closed:
-            success = False
-            rospy.loginfo("Failed because block in gripper or gripper closed")
-        else :
-            rospy.loginfo("Trying to Move to Block %d",req.target)
-            success = MoveToPose(block_poses[(req.target-1)])
-            print "Moved to Block is : %r" % success
+        if environment == "simulator" or environment == "robot":
+            print "Moving to block {0}".format(req.target)
+            if state.block_in_gripper > 0 or state.gripper_closed:
+                success = False
+                rospy.loginfo("Failed because block in gripper or gripper closed")
+            else :
+                rospy.loginfo("Trying to Move to Block %d",req.target)
+                success = MoveToPose(block_poses[(req.target-1)])
+                print "Moved to Block is : %r" % success
+        elif environment == "symbolic":
+            if state.block_in_gripper > 0 or state.gripper_closed:
+                success = False
+                rospy.loginfo("Failed because block in gripper or gripper closed")
+            else :
+                rospy.loginfo("Pretending to Move to Block %d",req.target)
+                print "Moved to Block is : %r" % success
+
 
         
 
     elif req.action == MOVE_OVER_BLOCK :
-        rospy.loginfo("Trying to Move OVER Block %d",req.target)
-        temppose = deepcopy(block_poses[(req.target-1)])
-        temppose.position.z += block_size
-        success = MoveToPose(temppose)
-        print "Moved OVER Block is : %r" % success
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Trying to Move OVER Block %d",req.target)
+            temppose = deepcopy(block_poses[(req.target-1)])
+            temppose.position.z += block_size
+            success = MoveToPose(temppose)
+            print "Moved OVER Block is : %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to Move OVER Block %d",req.target)
         
     elif req.action == MOVE_OVER_TABLE :
-        print "Moving over table"
-        delY = (1+((req.target - 1) % 5)) * 2 * block_size
-        print "DELY : %d", delY
-        if initial_pose.position.y > 0 :
-            delY = -delY
-        delX = (req.target - 1)/5 * 2 * block_size
-        
-        p = deepcopy(initial_pose)
-        p.position.x += delX
-        p.position.y += delY
-        p.position.z = table_z
-        success = MoveToPose(p)
-        print "Moved OVER Table : %r" % success
+        if environment == "simulator" or environment == "robot":
+            print "Moving over table"
+            delY = (1+((req.target - 1) % 5)) * 2 * block_size
+            print "DELY : %d", delY
+            if initial_pose.position.y > 0 :
+                delY = -delY
+            delX = (req.target - 1)/5 * 2 * block_size
+            
+            p = deepcopy(initial_pose)
+            p.position.x += delX
+            p.position.y += delY
+            p.position.z = table_z
+            success = MoveToPose(p)
+            print "Moved OVER Table : %r" % success
+        elif environment == "symbolic":
+            print "Pretending over table"
         
     elif req.action == MOVE_TO_STACK_BOTTOM :
-        rospy.loginfo("Moving to stack bottom")
-        p = deepcopy(initial_pose)
-        p.position.z = table_z
-        success = MoveToPose(p)
-        print "Moved To Stack Bottom : %r" % success
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to stack bottom")
+            p = deepcopy(initial_pose)
+            p.position.z = table_z
+            success = MoveToPose(p)
+            print "Moved To Stack Bottom : %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to move to stack bottom")
     else :
         print "invalid action"
 
