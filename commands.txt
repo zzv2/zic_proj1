@@ -9,3 +9,5 @@ rosrun baxter_tools enable_robot.py -e
 rosrun baxter_examples joint_position_keyboard.py
 
 rosrun baxter_interface joint_trajectory_action_server.py
+
+rosrun baxter_tools tuck_arms.py -u
