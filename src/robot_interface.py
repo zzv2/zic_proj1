@@ -87,7 +87,7 @@ def robot_interface():
     rospy.loginfo("num_blocks: %d",num_blocks)
 
     broadcast_rate = rospy.Rate(1) # 1 hz
-    HomePose()
+    # HomePose()
     while not rospy.is_shutdown():
         # publish state
         state_publisher.publish(state)
@@ -108,7 +108,7 @@ def HomePose() :
     homepose = Pose()
     homepose.position = Point(0.572578886689,0.181184911298,0.146191403844)
     homepose.orientation = Quaternion(0.140770659119,0.989645234506,0.0116543447684,0.0254972076605)
-    success = MoveToPose(homepose, False)
+    success = MoveToPose(homepose, False, False)
     rospy.loginfo("Got to Home Pose : %r", success)
 
 
@@ -116,15 +116,8 @@ def HomePose() :
 #updates our known location of hand
 #this will update 100 hz is this inefficient? 
 def respondToEndpoint(EndpointState) :
-    global hand_pose #can change to deep copy
+    global hand_pose
     hand_pose = deepcopy(EndpointState.pose)
-    #hand_pose.position.x = EndpointState.pose.position.x
-    #hand_pose.position.y = EndpointState.pose.position.y
-    #hand_pose.position.z = EndpointState.pose.position.z
-    #hand_pose.orientation.w = EndpointState.pose.orientation.w
-    #hand_pose.orientation.x = EndpointState.pose.orientation.x
-    #hand_pose.orientation.y = EndpointState.pose.orientation.y
-    #hand_pose.orientation.z = EndpointState.pose.orientation.z
 
     global initial_pose
     if initial_pose == Pose() :
@@ -141,7 +134,7 @@ def respondToEndpoint(EndpointState) :
             bp = deepcopy(EndpointState.pose)
             bp.position.z = EndpointState.pose.position.z - i * block_size
             block_poses.append(bp)
-        if rospy.get_param('configuration') == "stack_ascending" :
+        if rospy.get_param('configuration') == "stacked_ascending" :
             block_poses.reverse()
         rospy.loginfo("Initialized block positions")
         print block_poses
@@ -185,7 +178,8 @@ def handle_move_robot(req):
 
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Beginning to close Gripper")
-            left_gripper.close()
+            # left_gripper.set_holding_force(5)
+            left_gripper.close(block=True)
             rospy.loginfo("Closed Gripper")
         elif environment == "symbolic":
             rospy.loginfo("Pretending to close gripper")
@@ -209,7 +203,7 @@ def handle_move_robot(req):
                 rospy.loginfo("Failed because block in gripper or gripper closed")
             else :
                 rospy.loginfo("Pretending to Move to Block %d",req.target)
-                print "Moved to Block is : %r" % success
+                print "Pretend Moved to Block is : %r" % success
 
 
         
@@ -227,20 +221,24 @@ def handle_move_robot(req):
     elif req.action == MOVE_OVER_TABLE :
         if environment == "simulator" or environment == "robot":
             print "Moving over table"
-            delY = (1+((req.target - 1) % 5)) * 2 * block_size
+
+            block_off_stack = num_blocks - len(state.stack)
+
+            delY = (block_off_stack%5 * 2 +3) * block_size
             print "DELY : %d", delY
             if initial_pose.position.y > 0 :
                 delY = -delY
-            delX = (req.target - 1)/5 * 2 * block_size
+            delX = int(block_off_stack/5 + 1) * 2 * block_size
             
             p = deepcopy(initial_pose)
             p.position.x += delX
             p.position.y += delY
             p.position.z = table_z
+            rospy.loginfo(p.position)
             success = MoveToPose(p)
             print "Moved OVER Table : %r" % success
         elif environment == "symbolic":
-            print "Pretending over table"
+            print "Pretending to move over table"
         
     elif req.action == MOVE_TO_STACK_BOTTOM :
         if environment == "simulator" or environment == "robot":
@@ -269,11 +267,16 @@ def handle_get_world_state(req):
     resp.table = state.table
     return resp
 
-def MoveToPose (pose, intermediate = True) :
-    if intermediate :
-        b = MoveToIntermediatePose(pose)
-        if not b :
-            return False
+def MoveToPose (pose, inter1 = True, inter2 = True) :
+    global hand_pose
+    if inter1 :
+        b1 = MoveToIntermediatePose(hand_pose)
+        # if not b1 :
+        #     return False
+    if inter2 :
+        b2 = MoveToIntermediatePose(pose)
+        # if not b2 :
+        #     return False
 
     global MOVE_WAIT
     joint_solution = inverse_kinematics(pose)
@@ -290,7 +293,7 @@ def MoveToIntermediatePose(pose) :
     interpose = deepcopy(pose)
     global block_size
     global initial_pose
-    interpose.position.z = initial_pose.position.z + 2 * block_size
+    interpose.position.z += 2 * block_size
     joint_solution = inverse_kinematics(interpose)
     if joint_solution != [] :
         moveArm(joint_solution, 'left')
