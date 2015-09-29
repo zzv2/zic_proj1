@@ -17,14 +17,17 @@ state = State()
 hand_pose = Pose() #updated at 100 hz
 initial_pose = Pose()
 
-block_size = .04445 #meters, 1.75 inches
+block_size = .0448 #meters, 1.75 inches, .04445 meters
 num_blocks = 0
 
 table_z = 1 # <---find this
 
 block_poses = [] #positioned at initialization, block 1 at index 0, block 2 at index 1 etc
 
-MOVE_WAIT = .01
+MOVE_WAIT = .1
+GRIPPER_WAIT = .2
+
+limb = ""
 
 #locations on table will be given by function in this file
 
@@ -39,11 +42,18 @@ def robot_interface():
         global baxter
         baxter = RobotEnable()
         rospy.loginfo("Enabled Robot")
-    
-        rospy.loginfo("Beginning to initialize left gripper")
-        global left_gripper
-        left_gripper = Gripper('left')
-        rospy.loginfo("Left Gripper initialized")
+        
+        global limb
+        limb = rospy.get_param("limb")
+        global gripper
+        if limb == "left":
+            rospy.loginfo("Beginning to initialize left gripper")
+            gripper = Gripper(limb)
+            rospy.loginfo("Left Gripper initialized")
+        elif limb == "right":
+            rospy.loginfo("Beginning to initialize right gripper")
+            gripper = Gripper(limb)
+            rospy.loginfo("right Gripper initialized")
     elif environment == "symbolic":
         rospy.loginfo("Entering Symbolic Simulator")
     else:
@@ -53,13 +63,13 @@ def robot_interface():
 
     #initialize endpoint state so that we will be notified of robot arm position
     rospy.loginfo("Subscribing to topic /endpoint_state")
-    left_limb_subscriber = rospy.Subscriber("/robot/limb/left/endpoint_state", EndpointState, respondToEndpoint)
+    limb_subscriber = rospy.Subscriber("/robot/limb/"+limb+"/endpoint_state", EndpointState, respondToEndpoint)
     rospy.loginfo("Subscribed to topic /endpoint_state")
     
     move_robot_service = rospy.Service('/move_robot', MoveRobot, handle_move_robot) # /move_robot
     get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
 
-    ns = "ExternalTools/left/PositionKinematicsNode/IKService"
+    ns = "ExternalTools/"+limb+"/PositionKinematicsNode/IKService"
     try :
         rospy.loginfo("Initializing service proxy for /SolvePositionIK...")
         global iksvc
@@ -76,6 +86,7 @@ def robot_interface():
     global num_blocks
     num_blocks = rospy.get_param("num_blocks")
 
+    global state
     state.gripper_closed = False
     state.block_in_gripper = 0
     state.stack = range(1, num_blocks+1)
@@ -94,7 +105,7 @@ def robot_interface():
 	    #joint_solution = inverse_kinematics(hand_pose.position.x+.1, hand_pose.position.y, hand_pose.position.z)
 	    #print joint_solution
 	    #if joint_solution != [] :
-	    #moveArm(joint_solution,'left')
+	    #moveArm(joint_solution,limb)
         #rospy.loginfo(state)
         #rospy.loginfo("hand pose: ",hand_pose)
         #rospy.loginfo("initial pose: ",initial_pose)
@@ -108,7 +119,7 @@ def HomePose() :
     homepose = Pose()
     homepose.position = Point(0.572578886689,0.181184911298,0.146191403844)
     homepose.orientation = Quaternion(0.140770659119,0.989645234506,0.0116543447684,0.0254972076605)
-    success = MoveToPose(homepose, False, False)
+    success = MoveToPose(homepose, False, False, False)
     rospy.loginfo("Got to Home Pose : %r", success)
 
 
@@ -153,7 +164,9 @@ def handle_move_robot(req):
         #Move_over_block
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Beginning to open gripper")
-            left_gripper.open()
+            rospy.sleep(GRIPPER_WAIT)
+            gripper.open(block=True)
+            rospy.sleep(GRIPPER_WAIT)
             rospy.loginfo("Opened Gripper")
         elif environment == "symbolic":
             rospy.loginfo("Pretending to open gripper.")
@@ -178,8 +191,10 @@ def handle_move_robot(req):
 
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Beginning to close Gripper")
-            # left_gripper.set_holding_force(5)
-            left_gripper.close(block=True)
+            # gripper.set_holding_force(5)
+            rospy.sleep(GRIPPER_WAIT)
+            gripper.close(block=True)
+            rospy.sleep(GRIPPER_WAIT)
             rospy.loginfo("Closed Gripper")
         elif environment == "symbolic":
             rospy.loginfo("Pretending to close gripper")
@@ -222,13 +237,18 @@ def handle_move_robot(req):
         if environment == "simulator" or environment == "robot":
             print "Moving over table"
 
-            block_off_stack = num_blocks - len(state.stack)
+            num_per_row = 4
+            delY = (2 + (req.target-1) % num_per_row) * 2 * block_size
+            delX = -1 * (int( (req.target-1)/num_per_row ) - 1) * 2 * block_size
 
-            delY = (block_off_stack%5 * 2 +3) * block_size
+
+            # block_off_stack = num_blocks - len(state.stack)
+            # delY = (block_off_stack%5 * 2 +3) * block_size
+            # delX = int(block_off_stack/5 + 1) * 2 * block_size
+
             print "DELY : %d", delY
             if initial_pose.position.y > 0 :
                 delY = -delY
-            delX = int(block_off_stack/5 + 1) * 2 * block_size
             
             p = deepcopy(initial_pose)
             p.position.x += delX
@@ -267,43 +287,62 @@ def handle_get_world_state(req):
     resp.table = state.table
     return resp
 
-def MoveToPose (pose, inter1 = True, inter2 = True) :
+def MoveToPose (pose, inter1=True, inter2=True, inter3=True) :
     global hand_pose
+    global MOVE_WAIT
+
     if inter1 :
         b1 = MoveToIntermediatePose(hand_pose)
-        # if not b1 :
-        #     return False
     if inter2 :
         b2 = MoveToIntermediatePose(pose)
-        # if not b2 :
-        #     return False
+    if inter2 :
+        b3 = MoveToRightAbovePose(pose)
 
-    global MOVE_WAIT
     joint_solution = inverse_kinematics(pose)
     if joint_solution != [] :
-        moveArm(joint_solution, 'left')
-        rospy.sleep(MOVE_WAIT) #just a made up value atm
+        moveArm(joint_solution)
+        rospy.sleep(MOVE_WAIT)
         return True
     else :
         rospy.logerr("FAILED MoveToPose")
         return False
 
+def MoveToRightAbovePose(pose) :
+    global MOVE_WAIT
+
+    abovepose = deepcopy(pose)
+    abovepose.position.z += block_size
+
+    joint_solution = inverse_kinematics(abovepose)
+    if joint_solution != [] :
+        moveArm(joint_solution)
+        rospy.sleep(MOVE_WAIT)
+        return True
+    else :
+        rospy.logerr("FAILED MoveToAbovePose")
+        return False
+
 def MoveToIntermediatePose(pose) :
     global MOVE_WAIT
-    interpose = deepcopy(pose)
     global block_size
     global initial_pose
-    interpose.position.z += 2 * block_size
+    global state
+    global limb
+
+    interpose = deepcopy(pose)
+    interpose.position.z = (len(state.stack) + 1) * block_size
+
     joint_solution = inverse_kinematics(interpose)
     if joint_solution != [] :
-        moveArm(joint_solution, 'left')
+        moveArm(joint_solution)
         rospy.sleep(MOVE_WAIT) #just a made up value atm
         return True
     else :
         rospy.logerr("FAILED MoveToIntermediatePose")
         return False
 
-def moveArm (joint_solution, limb) :
+def moveArm (joint_solution) :
+    global limb
     arm = Limb(limb)
     #while not rospy.is_shutdown():
     arm.move_to_joint_positions(joint_solution)
@@ -315,21 +354,22 @@ def moveArm (joint_solution, limb) :
 def inverse_kinematics(ourpose) :
     # given x,y,z will call ik for this position with identity quaternion
     #in base frame
+    global limb
     ikreq = SolvePositionIKRequest()
 
     hdr = Header(stamp=rospy.Time.now(), frame_id='base')
     poses = {
-        'left' : PoseStamped(
+        limb : PoseStamped(
             header = hdr,
             pose = ourpose
         ),
     }         
     #getting ik of pose
      
-    ikreq.pose_stamp.append(poses['left'])
+    ikreq.pose_stamp.append(poses[limb])
 
     try :
-        ns = "ExternalTools/left/PositionKinematicsNode/IKService"
+        ns = "ExternalTools/"+limb+"/PositionKinematicsNode/IKService"
         rospy.wait_for_service(ns, 5.0)
         resp = iksvc(ikreq)
     except (rospy.ServiceException, rospy.ROSException), e:

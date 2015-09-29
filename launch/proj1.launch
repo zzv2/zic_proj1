@@ -1,8 +1,9 @@
 <launch>
 	<param name="num_blocks" value="10" type="int"/>
-	<param name="configuration" value="stacked_ascending" />
+	<param name="configuration" value="stacked_descending" />
         <!-- environment can be "symbolic", "simulator", "robot" -->
 	<param name="environment" value="simulator" />
+	<param name="limb" value="left" />
 
 	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen">
 	</node>
