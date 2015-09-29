@@ -21,9 +21,12 @@ def scatter():
         log_info("There are {0} blocks on the table".format(len(get_state().table)))
         log_info("Beginning to take block {0} off of the stack".format(current_block))
 
-        log_info("Beginning to move hand to block {0}".format(current_block))
-        move_robot(MOVE_TO_BLOCK, current_block)
-        log_info("Successfully moved hand to block {0}".format(current_block))
+        if len(get_state().table) == 0:
+            log_info("Robot is in starting configuration.  Skipping Directly to CLOSE_GRIPPER")
+        else:
+            log_info("Beginning to move hand to block {0}".format(current_block))
+            move_robot(MOVE_TO_BLOCK, current_block)
+            log_info("Successfully moved hand to block {0}".format(current_block))
 
         log_info("Beginning to close gripper around block {0}".format(current_block))
         move_robot(CLOSE_GRIPPER, current_block)
