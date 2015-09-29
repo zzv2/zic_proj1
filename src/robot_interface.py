@@ -17,15 +17,15 @@ state = State()
 hand_pose = Pose() #updated at 100 hz
 initial_pose = Pose()
 
-block_size = .0448 #meters, 1.75 inches, .04445 meters
+block_size = .045 #meters, 1.75 inches, .04445 meters
 num_blocks = 0
 
 table_z = 1 # <---find this
 
 block_poses = [] #positioned at initialization, block 1 at index 0, block 2 at index 1 etc
 
-MOVE_WAIT = .1
-GRIPPER_WAIT = .2
+MOVE_WAIT = 0.1
+GRIPPER_WAIT = 0.05
 
 limb = ""
 
@@ -129,7 +129,9 @@ def HomePose() :
 def respondToEndpoint(EndpointState) :
     global hand_pose
     hand_pose = deepcopy(EndpointState.pose)
+    initBlockPositions(EndpointState)
 
+def initBlockPositions(EndpointState):
     global initial_pose
     if initial_pose == Pose() :
         rospy.loginfo("Initializing block positions")
@@ -148,7 +150,7 @@ def respondToEndpoint(EndpointState) :
         if rospy.get_param('configuration') == "stacked_ascending" :
             block_poses.reverse()
         rospy.loginfo("Initialized block positions")
-        print block_poses
+        # print block_poses
 
 
 def handle_move_robot(req):
@@ -227,7 +229,8 @@ def handle_move_robot(req):
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Trying to Move OVER Block %d",req.target)
             temppose = deepcopy(block_poses[(req.target-1)])
-            temppose.position.z += block_size
+            # temppose.position.z += block_size + .001
+            temppose.position.z = table_z + len(state.stack) * block_size + .008
             success = MoveToPose(temppose)
             print "Moved OVER Block is : %r" % success
         elif environment == "symbolic":
@@ -239,14 +242,9 @@ def handle_move_robot(req):
 
             num_per_row = 4
             delY = (2 + (req.target-1) % num_per_row) * 2 * block_size
-            delX = -1 * (int( (req.target-1)/num_per_row ) - 1) * 2 * block_size
-
-
-            # block_off_stack = num_blocks - len(state.stack)
-            # delY = (block_off_stack%5 * 2 +3) * block_size
-            # delX = int(block_off_stack/5 + 1) * 2 * block_size
-
-            print "DELY : %d", delY
+            delX = -1 * (int( (req.target-1)/num_per_row ) + 0) * 2 * block_size
+            
+            # print "DELY : %d", delY
             if initial_pose.position.y > 0 :
                 delY = -delY
             

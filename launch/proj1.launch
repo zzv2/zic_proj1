@@ -3,7 +3,7 @@
 	<param name="configuration" value="stacked_descending" />
         <!-- environment can be "symbolic", "simulator", "robot" -->
 	<param name="environment" value="simulator" />
-	<param name="limb" value="left" />
+	<param name="limb" value="right" />
 
 	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen">
 	</node>
