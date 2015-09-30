@@ -24,6 +24,14 @@ table_z = 1 # <---find this
 
 block_poses = [] #positioned at initialization, block 1 at index 0, block 2 at index 1 etc
 
+left_tower = Pose() #*********************************************************HANOI 20
+mid_tower = Pose()
+right_tower = Pose()
+
+left = 0
+mid = 0
+right = 0
+
 MOVE_WAIT = 0.1
 GRIPPER_WAIT = 0.05
 
@@ -144,6 +152,17 @@ def initBlockPositions(EndpointState):
         rospy.loginfo("Initialized block positions")
         # print block_poses
 
+        global left_tower, right_tower, mid_tower, left #**HANOI
+        left = num_blocks
+        left_tower = deepcopy(EndpointState.pose)
+
+        mid_tower = deepcopy(left_tower)
+        mid_tower.position.y += block_size * 3
+        mid_tower.position.z = table_z - (2 * block_size)
+
+        right_tower = deepcopy(mid_tower)
+        right_tower.position.y += block_size * 3
+
 
 def handle_move_robot(req):
     environment = rospy.get_param("environment")
@@ -153,7 +172,125 @@ def handle_move_robot(req):
     global hand_pose
     global block_size
     global table_z
-    if req.action == OPEN_GRIPPER : # using the target as the destination for this block
+
+    global left_tower, mid_tower, right_tower, left, mid, right
+    
+    if req.action == OPEN_GRIPPER_HANOI :
+
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Beginning to open gripper")
+            rospy.sleep(GRIPPER_WAIT)
+            gripper.open(block=True)
+            rospy.sleep(GRIPPER_WAIT)
+            rospy.loginfo("Opened Gripper")
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to open gripper.")
+
+        if req.target == -2 :
+            #towers of hanoi
+
+            active_tower = ClosestToTower(hand_pose.position)
+
+            if active_tower == 1 :
+                left += 1
+                left_tower.position.z += block_size
+            elif active_tower == 2 :
+                mid += 1
+                mid_tower.position.z += block_size
+            elif active_tower == 3 :
+                right += 1
+                right_tower.position.z += block_size
+
+    elif req.action == CLOSE_GRIPPER_HANOI :
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Beginning to close Gripper")
+            # gripper.set_holding_force(5)
+            rospy.sleep(GRIPPER_WAIT)
+            gripper.close(block=True)
+            rospy.sleep(GRIPPER_WAIT)
+            rospy.loginfo("Closed Gripper")
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to close gripper")
+
+        active_tower = ClosestToTower(hand_pose.position)
+
+        if active_tower == 1 :
+            left -= 1
+            left_tower.position.z -= block_size
+        elif active_tower == 2 :
+            mid -= 1
+            mid_tower.position.z -= block_size
+        elif active_tower == 3 :
+            right -= 1
+            right_tower.position.z -= block_size
+
+        state.gripper_closed = True
+        state.block_in_gripper = req.target
+
+
+    elif req.action == MOVE_TO_LEFT_TOWER : #***********************HANOI 286 add special code to open
+        
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to LEFT_TOWER")
+            success = MoveToPose(left_tower)
+            print "Moved To LEFT TOWER: %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("MOVE TO LEFT TOWER")
+    elif req.action == MOVE_TO_ABOVE_LEFT_TOWER :
+        
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to above LEFT_TOWER")
+            l = deepcopy(left_tower)
+            l.position.z += block_size
+            success = MoveToPose(l)
+            print "Moved To above LEFT TOWER: %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("MOVE TO ABOVE LEFT TOWER")
+
+    elif req.action == MOVE_TO_MID_TOWER : #***********************HANOI 286 add special code to open
+     
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to MID_TOWER")
+            success = MoveToPose(mid_tower)
+            print "Moved To MID TOWER: %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("MOVE TO MID TOWER")
+
+
+    elif req.action == MOVE_TO_ABOVE_MID_TOWER :
+       
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to above MID_TOWER")
+            l = deepcopy(mid_tower)
+            l.position.z += block_size
+            success = MoveToPose(l)
+            print "Moved To ABOVE MID TOWER: %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("MOVE TO ABOVE MID TOWER")
+
+
+    elif req.action == MOVE_TO_RIGHT_TOWER : #***********************HANOI 286 add special code to open
+     
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to RIGHT TOWER")
+            success = MoveToPose(right_tower)
+            print "Moved To RIGHT TOWER: %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("MOVE TO RIGHT TOWER")
+
+    elif req.action == MOVE_TO_ABOVE_RIGHT_TOWER :
+       
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to above RIGHT_TOWER")
+            l = deepcopy(right_tower)
+            l.position.z += block_size
+            success = MoveToPose(l)
+            print "Moved To ABOVE RIGHT TOWER: %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("MOVE TO ABOVE RIGHT TOWER")
+
+
+    elif req.action == OPEN_GRIPPER : # using the target as the destination for this block
         # in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Beginning to open gripper")
@@ -265,6 +402,22 @@ def pick_and_place(source, destination):
     """ Routine is a stub, implemented for part 2(b) """
     pass
 
+def ClosestToTower(position) : #*******************HANOI 280
+    global left_tower, mid_tower, right_tower
+    dl = PointDistance(position,left_tower.position)
+    dm = PointDistance(position, mid_tower.position)
+    dr = PointDistance(position, right_tower.position)
+
+    m = min(min (dl,dm),dr)
+    if dl == m :
+        return 1
+    elif dm == m :
+        return 2
+    else :
+        return 3
+
+def PointDistance(p1, p2) :
+    return (((p1.x - p2.x) ** 2) + ((p1.y - p2.y) ** 2) + ((p1.z - p2.z) ** 2)) ** .5
 
 def handle_get_world_state(req):
     resp = GetStateResponse()

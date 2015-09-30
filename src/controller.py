@@ -10,6 +10,35 @@ def log_info(log_string):
 def log_err(log_string):
     rospy.logerr("Controller: {0}".format(log_string))
 
+def MoveTower(block, source, dest, spare) :
+    if block == 1 :
+        #move from source to dest
+        MoveBlock(block, source, dest)
+    else :
+        MoveTower(block - 1, source, spare, dest)
+        #move from source to dest
+        MoveBlock(block, source, dest)
+        MoveTower(block -1, spare, dest, source)
+
+def MoveBlock(block, source, dest) :
+    if source == 1 :
+        move_robot(MOVE_TO_LEFT_TOWER, block)
+    elif source == 2 :
+        move_robot(MOVE_TO_MID_TOWER, block)
+    else :
+        move_robot(MOVE_TO_RIGHT_TOWER, block)
+
+    move_robot(CLOSE_GRIPPER_HANOI, block)
+
+    if dest == 1 :
+        move_robot(MOVE_TO_ABOVE_LEFT_TOWER, block)
+    elif dest == 2 :
+        move_robot(MOVE_TO_ABOVE_MID_TOWER, block)
+    else :
+        move_robot(MOVE_TO_ABOVE_RIGHT_TOWER, block)
+
+    move_robot(OPEN_GRIPPER_HANOI, -2) #
+
 def scatter():
     log_info("Beginning to scatter blocks")
     n = rospy.get_param("num_blocks")
@@ -122,6 +151,7 @@ def stack_descending():
 
 
 def respond_to_command(command):
+    global get_state
     log_info("Recieved Command.")
     if command == String("scatter"):
         log_info("Command is \"scatter\"")
@@ -135,6 +165,10 @@ def respond_to_command(command):
         log_info("Command is \"stack_descending\"")
         stack_descending()
         log_info("Executed command \"stack_descending\"")
+    elif command == String("hanoi") :
+        log_info("Command is hanoi")
+        MoveTower( rospy.get_param("num_blocks"),1,3,2)
+        log_info("Executed command \"hanoi\"")
     else:
         log_err("Recieved invalid command: {0}".format(command))
 

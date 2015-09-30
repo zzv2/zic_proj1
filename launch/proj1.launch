@@ -1,5 +1,5 @@
 <launch>
-	<param name="num_blocks" value="10" type="int"/>
+	<param name="num_blocks" value="4" type="int"/>
 	<param name="configuration" value="stacked_descending" />
         <!-- environment can be "symbolic", "simulator", "robot" -->
 	<param name="environment" value="simulator" />
