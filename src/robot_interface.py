@@ -87,6 +87,7 @@ def robot_interface():
     num_blocks = rospy.get_param("num_blocks")
 
     global state
+    global block_poses
     state.gripper_closed = False
     state.block_in_gripper = 0
     state.stack = range(1, num_blocks+1)
@@ -101,16 +102,9 @@ def robot_interface():
     # HomePose()
     while not rospy.is_shutdown():
         # publish state
+        state.block_poses = block_poses
         state_publisher.publish(state)
-	    #joint_solution = inverse_kinematics(hand_pose.position.x+.1, hand_pose.position.y, hand_pose.position.z)
-	    #print joint_solution
-	    #if joint_solution != [] :
-	    #moveArm(joint_solution,limb)
-        #rospy.loginfo(state)
-        #rospy.loginfo("hand pose: ",hand_pose)
-        #rospy.loginfo("initial pose: ",initial_pose)
         broadcast_rate.sleep()
-
     
     rospy.spin()
 
@@ -122,10 +116,8 @@ def HomePose() :
     success = MoveToPose(homepose, False, False, False)
     rospy.loginfo("Got to Home Pose : %r", success)
 
-
-
-#updates our known location of hand
-#this will update 100 hz is this inefficient? 
+# updates our known location of hand
+# this will update 100 hz
 def respondToEndpoint(EndpointState) :
     global hand_pose
     hand_pose = deepcopy(EndpointState.pose)
@@ -136,7 +128,7 @@ def initBlockPositions(EndpointState):
     if initial_pose == Pose() :
         rospy.loginfo("Initializing block positions")
         initial_pose = hand_pose
-        #start of robot, save position and set up some positionings
+        # start of robot, save position and set up some positionings
         global num_blocks
         global block_poses
         global block_size
@@ -161,9 +153,8 @@ def handle_move_robot(req):
     global hand_pose
     global block_size
     global table_z
-    if req.action == OPEN_GRIPPER : #CHRIS  we are using the target as the destination for this block
-        #in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
-        #Move_over_block
+    if req.action == OPEN_GRIPPER : # using the target as the destination for this block
+        # in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Beginning to open gripper")
             rospy.sleep(GRIPPER_WAIT)
@@ -183,11 +174,9 @@ def handle_move_robot(req):
                 del state.table[state.table.index(state.block_in_gripper)]
             
             block_poses[(state.block_in_gripper - 1)] = deepcopy(hand_pose)
-            
 
         state.block_in_gripper = 0
         state.gripper_closed = False
-
 
     elif req.action == CLOSE_GRIPPER :
 
