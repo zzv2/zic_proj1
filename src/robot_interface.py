@@ -48,9 +48,10 @@ def robot_interface():
         
         global num_arms
         num_arms = rospy.get_param("num_arms")
-        if num_arms == 1:
-            global limb
-            limb = rospy.get_param("limb")
+        rospy.loginfo("num_arms: %d",num_arms)
+        global limb
+        limb = rospy.get_param("limb")
+        rospy.loginfo("limb: %s",limb)
 
         global gripper_left
         global gripper_right
@@ -99,7 +100,6 @@ def robot_interface():
     num_blocks = rospy.get_param("num_blocks")
 
     global state
-    global block_poses
     state.gripper_closed = False
     state.block_in_gripper = 0
     state.stack = range(1, num_blocks+1)
@@ -124,6 +124,7 @@ def robot_interface():
     # HomePose()
     while not rospy.is_shutdown():
         # publish state
+        global block_poses
         state.block_poses = block_poses
         state_publisher.publish(state)
         broadcast_rate.sleep()
@@ -142,30 +143,37 @@ def HomePose() :
 # this will update 100 hz
 def respondToEndpointRight(EndpointState) :
     global hand_pose_right
+    global limb
     hand_pose_right = deepcopy(EndpointState.pose)
-    initBlockPositions(EndpointState)
+    if limb == "right":
+        initBlockPositions(EndpointState)
 
 def respondToEndpointLeft(EndpointState) :
     global hand_pose_left
+    global limb
     hand_pose_left = deepcopy(EndpointState.pose)
-    # initBlockPositions(EndpointState)
+    if limb == "left":
+        initBlockPositions(EndpointState)
 
 def initBlockPositions(EndpointState):
     global initial_pose
+    global num_arms
+    global limb
     if initial_pose == Pose() :
         rospy.loginfo("Initializing block positions")
-        initial_pose = hand_pose_right
+
+        initial_pose = deepcopy(EndpointState.pose)
         # start of robot, save position and set up some positionings
         global num_blocks
         global block_poses
         global block_size
 
         global table_z
-        table_z = hand_pose_right.position.z - ((num_blocks -1) * block_size)
+        table_z = initial_pose.position.z - ((num_blocks -1) * block_size)
         for i in range(0,num_blocks) :
-            bp = deepcopy(EndpointState.pose)
-            bp.position.z = EndpointState.pose.position.z - i * block_size
-            block_poses.append(bp)
+            bp = deepcopy(initial_pose)
+            bp.position.z -= i * block_size
+            block_poses.append(deepcopy(bp))
         if rospy.get_param('configuration') == "stacked_ascending" :
             block_poses.reverse()
         rospy.loginfo("Initialized block positions")
@@ -179,9 +187,10 @@ def handle_move_robot(req):
     global limb
     global num_arms
     global block_poses
-    global hand_pose_right
     global block_size
     global table_z
+    global hand_pose_left
+    global hand_pose_right
     global gripper_left
     global gripper_right
 
@@ -192,15 +201,19 @@ def handle_move_robot(req):
             rospy.sleep(GRIPPER_WAIT)
 
             if num_arms == 1:
-                gripper[limb].open(block=True)
+                global gripper_left
+                global gripper_right
+                gripper = gripper_left if limb == "left" else gripper_right
+                gripper.open(block=True)
 
+            # move the arms out of the way after they put down the block
             global rest_pose_right
             global rest_pose_left
             if num_arms == 2:
-                if state.block_in_gripper % 2 == 0: # even block
+                if state.block_in_gripper % 2 == 0:
                     gripper_left.open(block=True)
                     success = MoveToPose("left", rest_pose_left, False, False, False)
-                elif state.block_in_gripper % 2 == 1: # odd block
+                elif state.block_in_gripper % 2 == 1:
                     gripper_right.open(block=True)
                     success = MoveToPose("right", rest_pose_right, False, False, False)
                 
@@ -218,11 +231,14 @@ def handle_move_robot(req):
             else : #appending to stack
                 state.stack.append(state.block_in_gripper)
                 del state.table[state.table.index(state.block_in_gripper)]
+
+            print "Saving block {0} new pose into {1} index".format(state.block_in_gripper,state.block_in_gripper - 1)
+            print block_poses
             if num_arms == 1:
-                hand_pose = hand_pose_left if limb == "left" else hand_pose_right
+                hand_pose = deepcopy(hand_pose_left) if limb == "left" else deepcopy(hand_pose_right)
                 block_poses[(state.block_in_gripper - 1)] = deepcopy(hand_pose)
             if num_arms == 2:
-                hand_pose = hand_pose_left if state.block_in_gripper % 2 == 0 else hand_pose_right
+                hand_pose = deepcopy(hand_pose_left) if state.block_in_gripper % 2 == 0 else deepcopy(hand_pose_right)
                 block_poses[(state.block_in_gripper - 1)] = deepcopy(hand_pose)
 
         state.block_in_gripper = 0
@@ -236,7 +252,10 @@ def handle_move_robot(req):
             rospy.sleep(GRIPPER_WAIT)
 
             if num_arms == 1:
-                gripper[limb].close(block=True)
+                global gripper_left
+                global gripper_right
+                gripper = gripper_left if limb == "left" else gripper_right
+                gripper.close(block=True)
 
             if num_arms == 2:
                 if req.target % 2 == 0: # even block
@@ -411,7 +430,8 @@ def MoveToIntermediatePose(cur_limb, pose) :
     global state
 
     interpose = deepcopy(pose)
-    interpose.position.z = (len(state.stack) + 1) * block_size
+    global table_z
+    interpose.position.z = table_z + (len(state.stack) + 2) * block_size
 
     joint_solution = inverse_kinematics(cur_limb, interpose)
     if joint_solution != [] :
