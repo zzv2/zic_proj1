@@ -69,7 +69,18 @@ def robot_interface():
 
     state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
 
-    #initialize endpoint state so that we will be notified of robot arm position
+    # initialize resting poses for both arms
+    global rest_pose_right
+    global rest_pose_left
+    rest_pose_right = Pose()
+
+    rest_pose_right.position = Point(0.576110449966,-0.308593767963,0.246190479074)
+    rest_pose_right.orientation = Quaternion(-0.01709843498,0.999460780088,-0.0147234076028,0.0238540113029)
+
+    rest_pose_left = deepcopy(rest_pose_right)
+    rest_pose_left.position.y *= -1
+
+    # initialize endpoint state so that we will be notified of robot arm position
     rospy.loginfo("Subscribing to topic /endpoint_state")
     right_limb_subscriber = rospy.Subscriber("/robot/limb/right/endpoint_state", EndpointState, respondToEndpointRight)
     left_limb_subscriber = rospy.Subscriber("/robot/limb/left/endpoint_state", EndpointState, respondToEndpointLeft)
@@ -91,7 +102,6 @@ def robot_interface():
         rospy.loginfo("Initialized service proxy for /SolvePositionIK...")
     except rospy.ServiceException, e:
         rospy.logerr("Service Call Failed: {0}".format(e))
-        
 
     print "Ready to move robot."
 
@@ -109,16 +119,6 @@ def robot_interface():
 
     rospy.loginfo("configuration: %s",config)
     rospy.loginfo("num_blocks: %d",num_blocks)
-
-    global rest_pose_right
-    global rest_pose_left
-    rest_pose_right = Pose()
-
-    rest_pose_right.position = Point(0.576110449966,-0.308593767963,0.246190479074)
-    rest_pose_right.orientation = Quaternion(-0.01709843498,0.999460780088,-0.0147234076028,0.0238540113029)
-
-    rest_pose_left = deepcopy(rest_pose_right)
-    rest_pose_left.position.y *= -1
 
     broadcast_rate = rospy.Rate(1) # 1 hz
     # HomePose()
@@ -159,16 +159,20 @@ def initBlockPositions(EndpointState):
     global initial_pose
     global num_arms
     global limb
+    global rest_pose_right
+    global rest_pose_left
+    global num_blocks
+    global block_poses
+    global block_size
+    global table_z
+
     if initial_pose == Pose() :
         rospy.loginfo("Initializing block positions")
 
         initial_pose = deepcopy(EndpointState.pose)
+        rest_pose_right.position.z = initial_pose.position.z + 2 * block_size
+        rest_pose_left.position.z = initial_pose.position.z + 2 * block_size
         # start of robot, save position and set up some positionings
-        global num_blocks
-        global block_poses
-        global block_size
-
-        global table_z
         table_z = initial_pose.position.z - ((num_blocks -1) * block_size)
         for i in range(0,num_blocks) :
             bp = deepcopy(initial_pose)
@@ -311,8 +315,13 @@ def handle_move_robot(req):
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Trying to Move OVER Block %d",req.target)
             temppose = deepcopy(block_poses[(req.target-1)])
-            # temppose.position.z += block_size + .001
-            temppose.position.z = table_z + len(state.stack) * block_size + .008
+
+            offset = .008
+            if req.target in state.stack:
+                temppose = deepcopy(initial_pose)
+                temppose.position.z = table_z + len(state.stack) * block_size + offset
+            else:
+                temppose.position.z += block_size
 
             cur_limb = ""
             if num_arms == 1:

@@ -120,6 +120,51 @@ def stack_descending():
     
     log_info("\nSuccessfully stacked blocks descending.\n\n")
 
+def odd_even():
+    n = rospy.get_param("num_blocks")
+    configuration = rospy.get_param("configuration")
+
+    log_info("Beginning to stack blocks odd_even")
+
+    top_two = get_state().stack[-2:]
+
+    while len(get_state().stack) > 0:
+        current_block = get_state().stack[-1]
+        log_info("\nBeginnning remove block subroutine for block {0}".format(current_block))
+        log_info("There are {0} blocks on the stack".format(len(get_state().stack)))
+        log_info("There are {0} blocks on the table".format(len(get_state().table)))
+        log_info("Beginning to take block {0} off of the stack".format(current_block))
+
+        if len(get_state().table) == 0:
+            log_info("Robot is in starting configuration. Skipping Directly to CLOSE_GRIPPER")
+        else:
+            log_info("Beginning to move hand to block {0}".format(current_block))
+            move_robot(MOVE_TO_BLOCK, current_block)
+            log_info("Successfully moved hand to block {0}".format(current_block))
+
+        log_info("Beginning to close gripper around block {0}".format(current_block))
+        move_robot(CLOSE_GRIPPER, current_block)
+        log_info("Successfully closed gripper around block {0}".format(current_block))
+
+        if current_block in top_two:
+            log_info("Begining to move gripper over table position for block {0}".format(current_block))
+            move_robot(MOVE_OVER_TABLE, current_block)
+            log_info("Successfully moved gripper over table position for block {0}".format(current_block))
+
+            log_info("Beginning to open gripper to release block {0} onto table.".format(current_block))
+            move_robot(OPEN_GRIPPER, -1)
+            log_info("Successfully deposited block {0} at its position on table".format(current_block))
+        else:
+            prev_block = current_block + 2 if configuration == "stacked_ascending" else current_block - 2
+            log_info("Moving block {0} above block {1}, on top of stack".format(current_block, prev_block))
+            move_robot(MOVE_OVER_BLOCK, prev_block)
+            log_info("Moved block {0} over block {1}, block {0} is on top of stack".format(current_block, prev_block))
+        
+            log_info("Releasing gripper around block {0}".format(current_block))
+            move_robot(OPEN_GRIPPER, -1)
+            log_info("Released block {0} from gripper".format(current_block))
+
+    log_info("\nSuccessfully stacked blocks odd_even.\n\n")
 
 def respond_to_command(command):
     log_info("Recieved Command.")
@@ -135,6 +180,10 @@ def respond_to_command(command):
         log_info("Command is \"stack_descending\"")
         stack_descending()
         log_info("Executed command \"stack_descending\"")
+    elif command == String("odd_even"):
+        log_info("Command is \"odd_even\"")
+        odd_even()
+        log_info("Executed command \"odd_even\"")
     else:
         log_err("Recieved invalid command: {0}".format(command))
 
@@ -157,7 +206,7 @@ def listener():
         # Initialize the service proxy for the /move_robot server
         log_info("Initializing service proxy for /move_robot...")
         global move_robot
-	move_robot = rospy.ServiceProxy("/move_robot", MoveRobot)
+        move_robot = rospy.ServiceProxy("/move_robot", MoveRobot)
         log_info("Initialized service proxy for /move_robot")
 
         # Initialize the service proxy for the /get_state server
@@ -165,7 +214,7 @@ def listener():
         global get_state
         get_state = rospy.ServiceProxy("/get_state", GetState)
         log_info("Initialized service proxy for /get_state...")
-    
+
         # the controller subscribes to the /command topic and listens for commands
         log_info("Subscribing to topic /command")
         rospy.Subscriber("command", String, respond_to_command)
