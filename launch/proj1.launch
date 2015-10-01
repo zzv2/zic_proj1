@@ -1,12 +1,20 @@
 <launch>
+	<!-- num_blocks can be "1", "2" ... "10" -->
 	<param name="num_blocks" value="3" type="int"/>
-	<param name="configuration" value="stacked_descending" />
-        <!-- environment can be "symbolic", "simulator", "robot" -->
+
+	<!-- configuration can be "stacked_ascending", "stacked_descending" -->
+	<param name="configuration" value="stacked_ascending" />
+
+	<!-- environment can be "symbolic", "simulator", "robot" -->
 	<param name="environment" value="simulator" />
-	<param name="limb" value="right" />
+
+	<!-- num_arms can be "1", "2" -->
 	<param name="num_arms" value="2" />
 
-	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen">
-	</node>
+	<!-- limb can be "right", "left" -->
+	<!-- when using 2 arms, limb is the arm starting above the stack -->
+	<param name="limb" value="right" />
+
+	<node name="robot_interface" pkg="zic_proj1" type="robot_interface.py" output="screen"/>
 	<node name="controller" pkg="zic_proj1" type="controller.py" output="screen"/>
 </launch>
