@@ -11,6 +11,7 @@ from baxter_core_msgs.msg import * #(SolvePositionIK, SolvePositionIKRequest)
 from baxter_core_msgs.srv import *
 from baxter_interface import *
 from copy import deepcopy
+from threading import Thread, Lock
 
 state = State()
 
@@ -48,10 +49,8 @@ def robot_interface():
         
         global num_arms
         num_arms = rospy.get_param("num_arms")
-        rospy.loginfo("num_arms: %d",num_arms)
         global limb
         limb = rospy.get_param("limb")
-        rospy.loginfo("limb: %s",limb)
 
         global gripper_left
         global gripper_right
@@ -67,7 +66,12 @@ def robot_interface():
     else:
         raise EnvironmentError("Invalid Environment variable")
 
-    state_publisher = rospy.Publisher('/state', State, queue_size=10) #initializes publisher to chatter, type of data to publish, size of messages to store
+    state_publisher = rospy.Publisher('/state', State, queue_size=10)
+
+    global right_lock_publisher
+    global left_lock_publisher
+    right_lock_publisher = rospy.Publisher('/right_lock', Bool, queue_size=10)
+    left_lock_publisher = rospy.Publisher('/left_lock', Bool, queue_size=10)
 
     # initialize resting poses for both arms
     global rest_pose_right
@@ -110,8 +114,10 @@ def robot_interface():
     num_blocks = rospy.get_param("num_blocks")
 
     global state
-    state.gripper_closed = False
-    state.block_in_gripper = 0
+    state.gripper_closed_left = False
+    state.gripper_closed_right = False
+    state.block_in_gripper_left = 0
+    state.block_in_gripper_right = 0
     state.stack = range(1, num_blocks+1)
     if config == "stacked_descending" :
         state.stack.reverse()
@@ -183,12 +189,27 @@ def initBlockPositions(EndpointState):
         rospy.loginfo("Initialized block positions")
         # print block_poses
 
-
 def handle_move_robot(req):
+    Arm(move_robot, req).start()
+    return MoveRobotResponse(True)
+
+def move_robot(req):
+    global right_lock_publisher
+    global left_lock_publisher
+    # if req.limb == "left":
+    #     left_lock_publisher.publish(True)
+    # elif req.limb == "right":
+    #     right_lock_publisher.publish(True)
+
+
+    # print "####################################################"
+    # print req.limb
+    # print "####################################################"
     environment = rospy.get_param("environment")
     success = True
+    block_in_gripper = state.block_in_gripper_left if limb == "left" else state.block_in_gripper_right
+    gripper_closed = state.gripper_closed_left if limb == "left" else state.gripper_closed_right
 
-    global limb
     global num_arms
     global block_poses
     global block_size
@@ -208,51 +229,53 @@ def handle_move_robot(req):
             rospy.loginfo("Beginning to open gripper")
             rospy.sleep(GRIPPER_WAIT)
 
-            if num_arms == 1:
-                gripper = gripper_left if limb == "left" else gripper_right
-                gripper.open(block=True)
-
-            if num_arms == 2:
-                if state.block_in_gripper % 2 == 0:
-                    gripper_left.open(block=True)
-                elif state.block_in_gripper % 2 == 1:
-                    gripper_right.open(block=True)
+            if req.limb == "left":
+                gripper_left.open(block=True)
+            elif req.limb == "right":
+                gripper_right.open(block=True)
 
             rospy.loginfo("Opened Gripper")
 
-            if state.block_in_gripper > 0 :
+            # print "##################################"
+            # print block_poses
+            # print "##################################"
+
+            if block_in_gripper > 0 :
                 # print "Saving block {0} new pose into {1} index".format(state.block_in_gripper,state.block_in_gripper - 1)
                 if num_arms == 1:
-                    curr_hand_pose = deepcopy(hand_pose_left) if limb == "left" else deepcopy(hand_pose_right)
-                    block_poses[(state.block_in_gripper - 1)] = deepcopy(curr_hand_pose)
+                    curr_hand_pose = deepcopy(hand_pose_left) if req.limb == "left" else deepcopy(hand_pose_right)
+                    block_poses[(block_in_gripper - 1)] = deepcopy(curr_hand_pose)
                 if num_arms == 2:
-                    curr_hand_pose = deepcopy(hand_pose_left) if state.block_in_gripper % 2 == 0 else deepcopy(hand_pose_right)
-                    block_poses[(state.block_in_gripper - 1)] = deepcopy(curr_hand_pose)
+                    curr_hand_pose = deepcopy(hand_pose_left) if req.limb == "left" else deepcopy(hand_pose_right)
+                    block_poses[(block_in_gripper - 1)] = deepcopy(curr_hand_pose)
 
             rospy.sleep(GRIPPER_WAIT)
 
             # move the arms out of the way after they put down the block
             if num_arms == 2:
-                if state.block_in_gripper % 2 == 0:
+                if req.limb == "left":
                     success = MoveToPose("left", rest_pose_left, True, False, False)
-                elif state.block_in_gripper % 2 == 1:
+                elif req.limb == "right":
                     success = MoveToPose("right", rest_pose_right, True, False, False)
 
         elif environment == "symbolic":
             rospy.loginfo("Pretending to open gripper.")
 
-        if state.block_in_gripper > 0 :
+        if block_in_gripper > 0 :
             if req.target == -1 : #putting block on table
-                state.table.append(state.block_in_gripper)
-                print "Deleting {0}".format(state.stack.index(state.block_in_gripper))
-                del state.stack[state.stack.index(state.block_in_gripper)]
+                state.table.append(block_in_gripper)
+                print "Deleting {0}".format(state.stack.index(block_in_gripper))
+                del state.stack[state.stack.index(block_in_gripper)]
             else : #appending to stack
-                state.stack.append(state.block_in_gripper)
-                del state.table[state.table.index(state.block_in_gripper)]
+                state.stack.append(block_in_gripper)
+                del state.table[state.table.index(block_in_gripper)]
 
-        state.block_in_gripper = 0
-        state.gripper_closed = False
-
+        if req.limb == "left":
+            state.block_in_gripper_left = 0
+            state.gripper_closed_left = False
+        if req.limb == "right":
+            state.block_in_gripper_right = 0
+            state.gripper_closed_right = False
 
 
     elif req.action == CLOSE_GRIPPER :
@@ -262,23 +285,22 @@ def handle_move_robot(req):
             # gripper.set_holding_force(5)
             rospy.sleep(GRIPPER_WAIT)
 
-            if num_arms == 1:
-                gripper = gripper_left if limb == "left" else gripper_right
-                gripper.close(block=True)
-
-            if num_arms == 2:
-                if req.target % 2 == 0: # even block
-                    gripper_left.close(block=True)
-                elif req.target % 2 == 1: # odd block
-                    gripper_right.close(block=True)
+            if req.limb == "left": # even block
+                gripper_left.close(block=True)
+            elif req.limb == "right": # odd block
+                gripper_right.close(block=True)
 
             rospy.sleep(GRIPPER_WAIT)
             rospy.loginfo("Closed Gripper")
         elif environment == "symbolic":
             rospy.loginfo("Pretending to close gripper")
 
-        state.gripper_closed = True
-        state.block_in_gripper = req.target
+        if req.limb == "left":
+            state.block_in_gripper_left = req.target
+            state.gripper_closed_left = True
+        if req.limb == "right":
+            state.block_in_gripper_right = req.target
+            state.gripper_closed_right = True
 
 
 
@@ -286,22 +308,17 @@ def handle_move_robot(req):
 
         if environment == "simulator" or environment == "robot":
             print "Moving to block {0}".format(req.target)
-            if state.block_in_gripper > 0 or state.gripper_closed:
+            if block_in_gripper > 0 or gripper_closed:
                 success = False
                 rospy.loginfo("Failed because block in gripper or gripper closed")
             else :
                 rospy.loginfo("Trying to Move to Block %d",req.target)
 
-                cur_limb = ""
-                if num_arms == 1:
-                    cur_limb = limb
-                if num_arms == 2:
-                    cur_limb = "left" if req.target % 2 == 0 else "right"
-                success = MoveToPose(cur_limb, block_poses[(req.target-1)])
+                success = MoveToPose(req.limb, block_poses[(req.target-1)])
 
                 print "Moved to Block is : %r" % success
         elif environment == "symbolic":
-            if state.block_in_gripper > 0 or state.gripper_closed:
+            if block_in_gripper > 0 or gripper_closed:
                 success = False
                 rospy.loginfo("Failed because block in gripper or gripper closed")
             else :
@@ -323,12 +340,7 @@ def handle_move_robot(req):
             else:
                 temppose.position.z += block_size
 
-            cur_limb = ""
-            if num_arms == 1:
-                cur_limb = limb
-            if num_arms == 2:
-                cur_limb = "left" if state.block_in_gripper % 2 == 0 else "right"
-            success = MoveToPose(cur_limb, temppose)
+            success = MoveToPose(req.limb, temppose)
 
             print "Moved OVER Block is : %r" % success
         elif environment == "symbolic":
@@ -346,8 +358,8 @@ def handle_move_robot(req):
             delY = ( (req.target-1) % num_per_row + 2 ) * 2 * block_size
             delX = -1 * (int( (req.target-1)/num_per_row ) - 1) * 2 * block_size
             if num_arms == 2:
-                if state.block_in_gripper % 2 == 1: # odd block, place to the right
-                    delY = -delY
+                if req.limb == "right":
+                    delY = -delY # place to the right
 
             
             if initial_pose.position.y > 0 and num_arms == 1:
@@ -358,12 +370,7 @@ def handle_move_robot(req):
             p.position.y += delY
             p.position.z = table_z
 
-            cur_limb = ""
-            if num_arms == 1:
-                cur_limb = limb
-            if num_arms == 2:
-                cur_limb = "left" if state.block_in_gripper % 2 == 0 else "right"
-            success = MoveToPose(cur_limb, p)
+            success = MoveToPose(req.limb, p)
 
             print "Moved OVER Table : %r" % success
         elif environment == "symbolic":
@@ -378,20 +385,23 @@ def handle_move_robot(req):
             p = deepcopy(initial_pose)
             p.position.z = table_z
 
-            cur_limb = ""
-            if num_arms == 1:
-                cur_limb = limb
-            if num_arms == 2:
-                cur_limb = "left" if state.block_in_gripper % 2 == 0 else "right"
-            success = MoveToPose(cur_limb, p)
+            success = MoveToPose(req.limb, p)
 
             print "Moved To Stack Bottom : %r" % success
         elif environment == "symbolic":
             rospy.loginfo("Pretending to move to stack bottom")
+        
+
+
+    elif req.action == WAIT_FOR_DONE :
+        rospy.loginfo("Waiting for arm to finish.")
     else :
         print "invalid action"
 
-    return MoveRobotResponse(success)
+    if req.limb == "left":
+        left_lock_publisher.publish(False)
+    elif req.limb == "right":
+        right_lock_publisher.publish(False)
 
 def pick_and_place(source, destination):
     """ Routine is a stub, implemented for part 2(b) """
@@ -400,8 +410,10 @@ def pick_and_place(source, destination):
 
 def handle_get_world_state(req):
     resp = GetStateResponse()
-    resp.gripper_closed = state.gripper_closed
-    resp.block_in_gripper = state.block_in_gripper
+    resp.gripper_closed_right = state.gripper_closed_right
+    resp.gripper_closed_left = state.gripper_closed_left
+    resp.block_in_gripper_right = state.block_in_gripper_right
+    resp.block_in_gripper_left = state.block_in_gripper_left
     resp.stack = state.stack
     resp.table = state.table
     return resp
@@ -507,6 +519,14 @@ def inverse_kinematics(cur_limb, pose) :
     else :
         rospy.logerr("Invalid pose")
         return []
+
+class Arm(Thread):
+    def __init__(self, target, *args):
+        Thread.__init__(self)
+        self._target = target
+        self._args = args
+    def run(self):
+        self._target(*self._args)
 
 if __name__ == '__main__':
     try:
