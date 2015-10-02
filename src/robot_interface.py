@@ -45,47 +45,64 @@ num_arms = 0
 
 #locations on table will be given by function in this file
 
+def log_info(message):
+    rospy.loginfo("Robot Interface: {0}".format(message))
+
+def log_err(message):
+    rospy.logerr("Robot Interface: {0}".format(message))
+
 def robot_interface():
     rospy.init_node('robot_interface')
-    rospy.loginfo("Initialized Robot Interface")
+    log_info("Initialized Robot Interface")
 
     environment = rospy.get_param("environment")
-    rospy.loginfo("Desired Environment is: {0}".format(environment))
+    log_info("Desired Environment is: {0}".format(environment))
     if environment == "simulator" or environment == "robot":
-        rospy.loginfo("Beginning to enable robot")
+        log_info("Beginning to set up robot")
+        log_info("Beginning to enable robot")
         global baxter
         baxter = RobotEnable()
-        rospy.loginfo("Enabled Robot")
+        log_info("Enabled Robot")
         
         global num_arms
         num_arms = rospy.get_param("num_arms")
+        log_info("Robot is functioning with {0} arms.".format(num_arms))
         global limb
         limb = rospy.get_param("limb")
+        log_info("Robot is starting with the {0} arm".format(limb))
 
         global gripper_left
         global gripper_right
-        rospy.loginfo("Beginning to initialize left gripper")
+        log_info("Beginning to initialize left gripper")
         gripper_left = Gripper('left')
-        rospy.loginfo("Left Gripper initialized")
-        rospy.loginfo("Beginning to initialize right gripper")
+        log_info("Left Gripper initialized")
+        log_info("Beginning to initialize right gripper")
         gripper_right = Gripper('right')
-        rospy.loginfo("right Gripper initialized")
-
+        log_info("Right Gripper initialized")
+        log_info("Finished Setting Up Robot.\n\n")
     elif environment == "symbolic":
-        rospy.loginfo("Entering Symbolic Simulator")
+        log_info("Entering Symbolic Simulator")
     else:
         raise EnvironmentError("Invalid Environment variable")
 
+    log_info("Beginning to start state publisher")
     state_publisher = rospy.Publisher('/state', State, queue_size=10)
+    log_info("Successfully started state publisher")
 
     global right_lock_publisher
     global left_lock_publisher
+    log_info("Beginning to initialize locks")
+    log_info("Initializing right lock publisher")
     right_lock_publisher = rospy.Publisher('/right_lock', Bool, queue_size=10)
+    log_info("Successfully initialized right lock publisher")
+    log_info("Initializing left lock publisher")
     left_lock_publisher = rospy.Publisher('/left_lock', Bool, queue_size=10)
+    log_info("Initialized left lock publisher")
 
     # initialize resting poses for both arms
     global rest_pose_right
     global rest_pose_left
+    log_info("Initializing rest poses")
     rest_pose_right = Pose()
 
     rest_pose_right.position = Point(0.576110449966,-0.308593767963,0.246190479074)
@@ -93,16 +110,28 @@ def robot_interface():
 
     rest_pose_left = deepcopy(rest_pose_right)
     rest_pose_left.position.y *= -1
+    log_info("Rest Poses Initialized")
+
 
     # initialize endpoint state so that we will be notified of robot arm position
-    rospy.loginfo("Subscribing to topic /endpoint_state")
+    log_info("Subscribing to topic /endpoint_state")
     right_limb_subscriber = rospy.Subscriber("/robot/limb/right/endpoint_state", EndpointState, respondToEndpointRight)
+    log_info("Subscribed to right endpoint state")
     left_limb_subscriber = rospy.Subscriber("/robot/limb/left/endpoint_state", EndpointState, respondToEndpointLeft)
+    log_ifno("Subscribed to left endpoint state")
     rospy.loginfo("Subscribed to topic /endpoint_state")
     
+    log_info("Initializing move robot service group")
+    log_info("Initializing move robot left service")
     move_robot_left_service = rospy.Service('/move_robot_left', MoveRobot, handle_move_robot_left) # /move_robot
+    log_info("Initialized move robot left service")
+    log_info("Initializing move robot right service")
     move_robot_right_service = rospy.Service('/move_robot_right', MoveRobot, handle_move_robot_right) # /move_robot
+    log_info("Initialized robot right service")
+
+    log_info("Initializing get_state service")
     get_state_service = rospy.Service('/get_state', GetState, handle_get_world_state) # /move_robot
+    log_info("Initialized get_state service")
 
     ns_right = "ExternalTools/right/PositionKinematicsNode/IKService"
     ns_left = "ExternalTools/left/PositionKinematicsNode/IKService"
@@ -118,11 +147,13 @@ def robot_interface():
     except rospy.ServiceException, e:
         rospy.logerr("Service Call Failed: {0}".format(e))
 
-    print "Ready to move robot."
+    log_info("\nREADY TO MOVE ROBOT\n")
 
     config = rospy.get_param('configuration')
+    log_info("Configuration: {0}".format(config))
     global num_blocks
     num_blocks = rospy.get_param("num_blocks")
+    log_info("There are {0} blocks on the table".format(num_blocks))
 
     global state
     state.gripper_closed = [False,False]
@@ -131,9 +162,10 @@ def robot_interface():
     if config == "stacked_descending" :
         state.stack.reverse()
     state.table = []
+    log_info("Initialized State")
 
-    rospy.loginfo("configuration: %s",config)
-    rospy.loginfo("num_blocks: %d",num_blocks)
+    log_info("configuration: %s",config)
+    log_info("num_blocks: %d",num_blocks)
 
     broadcast_rate = rospy.Rate(1) # 1 hz
     # HomePose()
@@ -147,12 +179,12 @@ def robot_interface():
     rospy.spin()
 
 def HomePose() :
-    rospy.loginfo("Going to Home Pose")
+    log_info("Going to Home Pose")
     homepose = Pose()
     homepose.position = Point(0.572578886689,0.181184911298,0.146191403844)
     homepose.orientation = Quaternion(0.140770659119,0.989645234506,0.0116543447684,0.0254972076605)
     success = MoveToPose(homepose, False, False, False)
-    rospy.loginfo("Got to Home Pose : %r", success)
+    log_info("Got to Home Pose : {0}".format(success))
 
 # updates our known location of hand
 # this will update 100 hz
@@ -174,7 +206,7 @@ def initBlockPositions(EndpointState):
     global initial_pose, num_arms,limb,rest_pose_right,rest_pose_left,num_blocks,block_poses,block_size,table_z
 
     if initial_pose == Pose() :
-        rospy.loginfo("Initializing block positions")
+        log_info("Initializing block positions")
 
         initial_pose = deepcopy(EndpointState.pose)
         rest_pose_right.position.z = initial_pose.position.z + 2 * block_size
@@ -187,9 +219,10 @@ def initBlockPositions(EndpointState):
             block_poses.append(deepcopy(bp))
         if rospy.get_param('configuration') == "stacked_ascending" :
             block_poses.reverse()
-        rospy.loginfo("Initialized block positions")
+        log_info("Initialized block positions")
         # print block_poses
 
+    log_info("Initializing Tower Positions")
     global left_tower, right_tower, mid_tower, left #**HANOI
     left = num_blocks
     left_tower = deepcopy(EndpointState.pose)
@@ -200,7 +233,7 @@ def initBlockPositions(EndpointState):
 
     right_tower = deepcopy(mid_tower)
     right_tower.position.y += block_size * 3
-
+    log_info("Initialized Tower Positions")
 
 def handle_move_robot(req):
     Arm(move_robot, req).start()
@@ -243,16 +276,18 @@ def move_robot(req,reqlimb):
     if req.action == OPEN_GRIPPER_HANOI :
 
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Beginning to open gripper")
+            log_info("Beginning to open gripper")
             rospy.sleep(GRIPPER_WAIT)
             if reqlimb == "left":
+                log_info("Opening Left Gripper")
                 gripper_left.open(block=True)
             elif reqlimb == "right":
+                log_info("Opening Right Gripper")
                 gripper_right.open(block=True)
             rospy.sleep(GRIPPER_WAIT)
-            rospy.loginfo("Opened Gripper")
+            log_info("Opened Gripper")
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to open gripper.")
+            log_info("Pretending to open gripper.")
 
         if req.target == -2 :
             #towers of hanoi
@@ -270,7 +305,7 @@ def move_robot(req,reqlimb):
 
     elif req.action == CLOSE_GRIPPER_HANOI :
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Beginning to close Gripper")
+            log_info("Beginning to close Gripper")
             # gripper.set_holding_force(5)
             rospy.sleep(GRIPPER_WAIT)
 
@@ -280,9 +315,9 @@ def move_robot(req,reqlimb):
                 gripper_right.close(block=True)
 
             rospy.sleep(GRIPPER_WAIT)
-            rospy.loginfo("Closed Gripper")
+            log_info("Closed Gripper")
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to close gripper")
+            log_info("Pretending to close gripper")
 
 
         if active_tower == 1 :
@@ -302,70 +337,70 @@ def move_robot(req,reqlimb):
     elif req.action == MOVE_TO_LEFT_TOWER :
         
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to LEFT_TOWER")
+            log_info("Moving to LEFT_TOWER")
             active_tower = 1
             success = MoveToPose(reqlimb, left_tower)
-            print "Moved To LEFT TOWER: %r" % success
+            log_info("Moved To LEFT TOWER: {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("MOVE TO LEFT TOWER")
+            log_info("MOVE TO LEFT TOWER")
     elif req.action == MOVE_TO_ABOVE_LEFT_TOWER :
         
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to above LEFT_TOWER")
+            log_info("Moving to above LEFT_TOWER")
             l = deepcopy(left_tower)
             l.position.z += block_size
             active_tower = 1
 
             success = MoveToPose(reqlimb, l)
-            print "Moved To above LEFT TOWER: %r" % success
+            log_info("Moved To above LEFT TOWER: {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("MOVE TO ABOVE LEFT TOWER")
+            log_info("MOVE TO ABOVE LEFT TOWER")
 
     elif req.action == MOVE_TO_MID_TOWER :
      
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to MID_TOWER")
+            log_info("Moving to MID_TOWER")
             active_tower = 2
             success = MoveToPose(reqlimb, mid_tower)
-            print "Moved To MID TOWER: %r" % success
+            log_info("Moved To MID TOWER: {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("MOVE TO MID TOWER")
+            log_info("MOVE TO MID TOWER")
 
 
     elif req.action == MOVE_TO_ABOVE_MID_TOWER :
        
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to above MID_TOWER")
+            log_info("Moving to above MID_TOWER")
             l = deepcopy(mid_tower)
             active_tower = 2
             l.position.z += block_size
             success = MoveToPose(reqlimb, l)
-            print "Moved To ABOVE MID TOWER: %r" % success
+            log_info("Moved To ABOVE MID TOWER: {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("MOVE TO ABOVE MID TOWER")
+            log_info("MOVE TO ABOVE MID TOWER")
 
 
     elif req.action == MOVE_TO_RIGHT_TOWER :
      
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to RIGHT TOWER")
+            log_info("Moving to RIGHT TOWER")
             active_tower = 3
             success = MoveToPose(reqlimb, right_tower)
-            print "Moved To RIGHT TOWER: %r" % success
+            log_info("Moved To RIGHT TOWER: {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("MOVE TO RIGHT TOWER")
+            log_info("MOVE TO RIGHT TOWER")
 
     elif req.action == MOVE_TO_ABOVE_RIGHT_TOWER :
        
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to above RIGHT_TOWER")
+            log_info("Moving to above RIGHT_TOWER")
             l = deepcopy(right_tower)
             active_tower = 3
             l.position.z += block_size
             success = MoveToPose(reqlimb, l)
-            print "Moved To ABOVE RIGHT TOWER: %r" % success
+            log_info("Moved To ABOVE RIGHT TOWER: {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("MOVE TO ABOVE RIGHT TOWER")
+            log_info("MOVE TO ABOVE RIGHT TOWER")
 
 
 
@@ -374,7 +409,7 @@ def move_robot(req,reqlimb):
         # using the target as the destination for this block
         # in practice this means calling MoveRobot -OPEN_GRIPPER with same target as Move_Robot - 
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Beginning to open gripper")
+            log_info("Beginning to open gripper")
             rospy.sleep(GRIPPER_WAIT)
 
             if reqlimb == "left":
@@ -382,7 +417,7 @@ def move_robot(req,reqlimb):
             elif reqlimb == "right":
                 gripper_right.open(block=True)
 
-            rospy.loginfo("Opened Gripper")
+            log_info("Opened Gripper")
 
             # print "##################################"
             # print block_poses
@@ -407,12 +442,12 @@ def move_robot(req,reqlimb):
             #         success = MoveToPose("right", rest_pose_right, True, False, False)
 
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to open gripper.")
+            log_info("Pretending to open gripper.")
 
         if state.block_in_gripper[idx] > 0 :
             if req.target == -1 : #putting block on table
                 state.table.append(state.block_in_gripper[idx])
-                print "Deleting {0}".format(state.stack.index(state.block_in_gripper[idx]))
+                log_info("Deleting {0}".format(state.stack.index(state.block_in_gripper[idx])))
                 del state.stack[state.stack.index(state.block_in_gripper[idx])]
             else : #appending to stack
                 state.stack.append(state.block_in_gripper[idx])
@@ -425,7 +460,7 @@ def move_robot(req,reqlimb):
     elif req.action == CLOSE_GRIPPER :
 
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Beginning to close Gripper")
+            log_info("Beginning to close Gripper")
             # gripper.set_holding_force(5)
             rospy.sleep(GRIPPER_WAIT)
 
@@ -435,9 +470,9 @@ def move_robot(req,reqlimb):
                 gripper_right.close(block=True)
 
             rospy.sleep(GRIPPER_WAIT)
-            rospy.loginfo("Closed Gripper")
+            log_info("Closed Gripper")
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to close gripper")
+            log_info("Pretending to close gripper")
 
         state.block_in_gripper[idx] = req.target
         state.gripper_closed[idx] = True
@@ -447,7 +482,7 @@ def move_robot(req,reqlimb):
     elif req.action == MOVE_TO_BLOCK :
 
         if environment == "simulator" or environment == "robot":
-            print "Moving to block {0}".format(req.target)
+            log_info("Moving to block {0}".format(req.target))
 
             # print "###############################################"
             # print "limb: {0}, block_in_gripper: {1}, gripper_closed: {2}".format(reqlimb,block_in_gripper,gripper_closed)
@@ -457,27 +492,27 @@ def move_robot(req,reqlimb):
 
             if state.block_in_gripper[idx] > 0 or state.gripper_closed[idx]:
                 success = False
-                rospy.loginfo("Failed because block in gripper or gripper closed")
+                log_info("Failed because block in gripper or gripper closed")
             else :
-                rospy.loginfo("Trying to Move to Block %d",req.target)
+                log_info("Trying to Move to Block {0}".format(req.target))
 
                 success = MoveToPose(reqlimb, block_poses[(req.target-1)])
 
-                print "Moved to Block is : %r" % success
+                log_info("Moved to Block is : {0}".format(success))
         elif environment == "symbolic":
             if state.block_in_gripper[idx] > 0 or state.gripper_closed[idx]:
                 success = False
-                rospy.loginfo("Failed because block in gripper or gripper closed")
+                log_info("Failed because block in gripper or gripper closed")
             else :
-                rospy.loginfo("Pretending to Move to Block %d",req.target)
-                print "Pretend Moved to Block is : %r" % success
+                log_info("Pretending to Move to Block {0}".format(req.target))
+                log_info("Pretend Moved to Block is : {0}".format(success))
 
 
 
     elif req.action == MOVE_OVER_BLOCK :
 
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Trying to Move OVER Block %d",req.target)
+            log_info("Trying to Move OVER Block %d",req.target)
             temppose = deepcopy(block_poses[(req.target-1)])
 
             offset = .008
@@ -489,16 +524,16 @@ def move_robot(req,reqlimb):
 
             success = MoveToPose(reqlimb, temppose)
 
-            print "Moved OVER Block is : %r" % success
+            log_info("Moved OVER Block is : {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to Move OVER Block %d",req.target)
+            log_info("Pretending to Move OVER Block %d",req.target)
         
 
 
     elif req.action == MOVE_OVER_TABLE :
 
         if environment == "simulator" or environment == "robot":
-            print "Moving over table"
+            log_info("Moving over table")
 
             num_per_row = 4
 
@@ -519,49 +554,48 @@ def move_robot(req,reqlimb):
 
             success = MoveToPose(reqlimb, p)
 
-            print "Moved OVER Table : %r" % success
+            log_info("Moved OVER Table : {0}".format(success))
         elif environment == "symbolic":
-            print "Pretending to move over table"
+            log_info("Pretending to move over table")
         
 
 
     elif req.action == MOVE_TO_STACK_BOTTOM :
 
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to stack bottom")
+            log_info("Moving to stack bottom")
             p = deepcopy(initial_pose)
             p.position.z = table_z
 
             success = MoveToPose(reqlimb, p)
 
-            print "Moved To Stack Bottom : %r" % success
+            log_info("Moved To Stack Bottom : {0}".format(success))
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to move to stack bottom")
+            log_info("Pretending to move to stack bottom")
         
 
 
     elif req.action == MOVE_TO_RESTING :
         if environment == "simulator" or environment == "robot":
-            rospy.loginfo("Moving to resting")
+            log_info("Moving to resting")
             
             p = rest_pose_left if reqlimb == "left" else rest_pose_right
             success = MoveToPose(reqlimb, p, True, False, False)
 
-            print "Moved To Resting : %r" % success
+            log_info("Moved To Resting : {0}".success))
         elif environment == "symbolic":
-            rospy.loginfo("Pretending to move to resting")
+            log_info("Pretending to move to resting")
     else :
-        print "invalid action"
+        log_err("invalid action")
 
     if reqlimb == "left":
+        log_info("Unlocking left arm")
         left_lock_publisher.publish(False)
+        log_info("Unlocked left arm")
     elif reqlimb == "right":
+        log_info("Unlocking right arm")
         right_lock_publisher.publish(False)
-
-def pick_and_place(source, destination):
-    """ Routine is a stub, implemented for part 2(b) """
-    pass
-
+        log_info("Unlocked right arm")
 
 def handle_get_world_state(req):
     resp = GetStateResponse()
@@ -593,7 +627,7 @@ def MoveToPose (cur_limb, pose, inter1=True, inter2=True, inter3=True) :
         rospy.sleep(MOVE_WAIT)
         return True
     else :
-        rospy.logerr("FAILED MoveToPose")
+        log_err("FAILED MoveToPose")
         return False
 
 def MoveToRightAbovePose(cur_limb, pose) :
@@ -608,7 +642,7 @@ def MoveToRightAbovePose(cur_limb, pose) :
         rospy.sleep(MOVE_WAIT)
         return True
     else :
-        rospy.logerr("FAILED MoveToAbovePose")
+        log_err("FAILED MoveToAbovePose")
         return False
 
 def MoveToIntermediatePose(cur_limb, pose) :
@@ -627,7 +661,7 @@ def MoveToIntermediatePose(cur_limb, pose) :
         rospy.sleep(MOVE_WAIT) #just a made up value atm
         return True
     else :
-        rospy.logerr("FAILED MoveToIntermediatePose")
+        log_err("FAILED MoveToIntermediatePose")
         return False
 
 def moveArm (cur_limb, joint_solution) :
@@ -662,16 +696,23 @@ def inverse_kinematics(cur_limb, pose) :
         elif cur_limb == "right":
             resp = iksvc_right(ikreq)
     except (rospy.ServiceException, rospy.ROSException), e:
-        rospy.logerr("Service call failed: %s" % (e,))
-        return []
+        log_err("Service call failed: %s" % (e,))
+        new_pose = deepcopy(pose)
+        new_pose.position.z -= 0.01
+        log_info("Trying recursive pose call, ...")
+        return inverse_kinematics(cur_limb, new_pose)
+
     if (resp.isValid[0]):
-        print("SUCCESS - Valid Joint Solution Found:")
+        log_info("SUCCESS - Valid Joint Solution Found:")
         limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
         #print limb_joints
         return limb_joints
     else :
-        rospy.logerr("Invalid pose")
-        return []
+        log_err("Invalid pose")
+        new_pose = deepcopy(pose)
+        new_pose.position.z -= 0.01
+        log_info("Trying recursive pose call, ...")
+        return inverse_kinematics(cur_limb, new_pose)
 
 class Arm(Thread):
     def __init__(self, target, *args):
