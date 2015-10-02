@@ -395,31 +395,31 @@ def move_robot(req,reqlimb):
                 # print "Saving block {0} new pose into {1} index".format(state.block_in_gripper,state.block_in_gripper - 1)
                 if num_arms == 1:
                     curr_hand_pose = deepcopy(hand_pose_left) if reqlimb == "left" else deepcopy(hand_pose_right)
-                    block_poses[(block_in_gripper - 1)] = deepcopy(curr_hand_pose)
+                    block_poses[(state.block_in_gripper[idx] - 1)] = deepcopy(curr_hand_pose)
                 if num_arms == 2:
                     curr_hand_pose = deepcopy(hand_pose_left) if reqlimb == "left" else deepcopy(hand_pose_right)
-                    block_poses[(block_in_gripper - 1)] = deepcopy(curr_hand_pose)
+                    block_poses[(state.block_in_gripper[idx] - 1)] = deepcopy(curr_hand_pose)
 
             rospy.sleep(GRIPPER_WAIT)
 
             # move the arms out of the way after they put down the block
-            if num_arms == 2:
-                if reqlimb == "left":
-                    success = MoveToPose("left", rest_pose_left, True, False, False)
-                elif reqlimb == "right":
-                    success = MoveToPose("right", rest_pose_right, True, False, False)
+            # if num_arms == 2:
+            #     if reqlimb == "left":
+            #         success = MoveToPose("left", rest_pose_left, True, False, False)
+            #     elif reqlimb == "right":
+            #         success = MoveToPose("right", rest_pose_right, True, False, False)
 
         elif environment == "symbolic":
             rospy.loginfo("Pretending to open gripper.")
 
         if state.block_in_gripper[idx] > 0 :
             if req.target == -1 : #putting block on table
-                state.table.append(block_in_gripper)
-                print "Deleting {0}".format(state.stack.index(block_in_gripper))
-                del state.stack[state.stack.index(block_in_gripper)]
+                state.table.append(state.block_in_gripper[idx])
+                print "Deleting {0}".format(state.stack.index(state.block_in_gripper[idx]))
+                del state.stack[state.stack.index(state.block_in_gripper[idx])]
             else : #appending to stack
-                state.stack.append(block_in_gripper)
-                del state.table[state.table.index(block_in_gripper)]
+                state.stack.append(state.block_in_gripper[idx])
+                del state.table[state.table.index(state.block_in_gripper[idx])]
 
         state.block_in_gripper[idx] = 0
         state.gripper_closed[idx] = False
@@ -548,10 +548,10 @@ def move_robot(req,reqlimb):
     else :
         print "invalid action"
 
-    # if reqlimb == "left":
-    #     left_lock_publisher.publish(False)
-    # elif reqlimb == "right":
-    #     right_lock_publisher.publish(False)
+    if reqlimb == "left":
+        left_lock_publisher.publish(False)
+    elif reqlimb == "right":
+        right_lock_publisher.publish(False)
 
 def pick_and_place(source, destination):
     """ Routine is a stub, implemented for part 2(b) """
