@@ -25,6 +25,11 @@ def MoveTower(block, source, dest, spare) :
         MoveTower(block -1, spare, dest, source)
 
 def MoveBlock(block, source, dest) :
+    limb = rospy.get_param("limb")
+    move_robot = move_robot_left if limb == "left" else move_robot_right
+    lock = left_lock if limb == "left" else right_lock
+
+    lock.acquire()
     if source == 1 :
         move_robot(MOVE_TO_LEFT_TOWER, block)
     elif source == 2 :
@@ -32,8 +37,10 @@ def MoveBlock(block, source, dest) :
     else :
         move_robot(MOVE_TO_RIGHT_TOWER, block)
 
+    lock.acquire()
     move_robot(CLOSE_GRIPPER_HANOI, block)
 
+    lock.acquire()
     if dest == 1 :
         move_robot(MOVE_TO_ABOVE_LEFT_TOWER, block)
     elif dest == 2 :
@@ -41,7 +48,10 @@ def MoveBlock(block, source, dest) :
     else :
         move_robot(MOVE_TO_ABOVE_RIGHT_TOWER, block)
 
-    move_robot(OPEN_GRIPPER_HANOI, -2) #
+    lock.acquire()
+    move_robot(OPEN_GRIPPER_HANOI, -2)
+    lock.acquire()
+    lock.release()
 
 def scatter():
     num_arms = rospy.get_param("num_arms")
@@ -97,7 +107,7 @@ def stack_ascending():
 
     log_info("Beginning to stack blocks ascending")
 
-    if sorted(get_state().stack) is get_state().stack:
+    if sorted(get_state().stack) == get_state().stack:
         log_info("Blocks already stacked ascending.\n")
         return True
     elif len(get_state().stack) > 0:
@@ -164,7 +174,7 @@ def stack_ascending_parallel():
     lock = left_lock if limb == "left" else right_lock
     lock_other = right_lock if limb == "left" else left_lock
 
-    if sorted(get_state().stack) is get_state().stack:
+    if sorted(get_state().stack) == get_state().stack:
         log_info("Blocks already stacked ascending.\n")
         return True
     elif len(get_state().stack) > 0:
@@ -311,7 +321,7 @@ def stack_descending():
 
     log_info("Beginning to stack blocks descending")
 
-    if list(reversed(sorted(get_state().stack))) is get_state().stack:
+    if list(reversed(sorted(get_state().stack))) == get_state().stack:
         log_info("Blocks already stacked descending.\n")
         return True
     elif len(get_state().stack) > 0:
@@ -381,7 +391,7 @@ def stack_descending_parallel():
 
     log_info("Beginning to stack blocks descending")
 
-    if list(reversed(sorted(get_state().stack))) is get_state().stack:
+    if list(reversed(sorted(get_state().stack))) == get_state().stack:
         log_info("Blocks already stacked descending.\n")
         return True
     elif len(get_state().stack) > 0:
@@ -916,6 +926,8 @@ def respond_to_command(command):
         log_info("Executed command \"odd_even\"")
     elif command == String("hanoi") :
         log_info("Command is hanoi")
+        if not num_arms == 1:
+            raise Exception("num_arms needs to be 1 for hanoi")
         MoveTower( rospy.get_param("num_blocks"),1,3,2)
         log_info("Executed command \"hanoi\"")
     else:

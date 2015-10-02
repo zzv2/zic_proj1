@@ -224,19 +224,8 @@ def move_robot(req,reqlimb):
     elif reqlimb == "right":
         idx = 1
 
-
-    # print "####################################################"
-    # print reqlimb
-    # print "####################################################"
     environment = rospy.get_param("environment")
     success = True
-    # block_in_gripper = state.block_in_gripper_left if limb == "left" else state.block_in_gripper_right
-    # gripper_closed = state.gripper_closed_left if limb == "left" else state.gripper_closed_right
-
-    # print "###############################################"
-    # print "limb: {0}, block_in_gripper: {1}, gripper_closed: {2}".format(reqlimb,block_in_gripper,gripper_closed)
-    # print "###############################################"
-
 
     global num_arms
     global block_poses
@@ -256,7 +245,10 @@ def move_robot(req,reqlimb):
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Beginning to open gripper")
             rospy.sleep(GRIPPER_WAIT)
-            gripper.open(block=True)
+            if reqlimb == "left":
+                gripper_left.open(block=True)
+            elif reqlimb == "right":
+                gripper_right.open(block=True)
             rospy.sleep(GRIPPER_WAIT)
             rospy.loginfo("Opened Gripper")
         elif environment == "symbolic":
@@ -281,7 +273,12 @@ def move_robot(req,reqlimb):
             rospy.loginfo("Beginning to close Gripper")
             # gripper.set_holding_force(5)
             rospy.sleep(GRIPPER_WAIT)
-            gripper.close(block=True)
+
+            if reqlimb == "left":
+                gripper_left.close(block=True)
+            elif reqlimb == "right":
+                gripper_right.close(block=True)
+
             rospy.sleep(GRIPPER_WAIT)
             rospy.loginfo("Closed Gripper")
         elif environment == "symbolic":
@@ -302,12 +299,12 @@ def move_robot(req,reqlimb):
         state.block_in_gripper[idx] = req.target
 
 
-    elif req.action == MOVE_TO_LEFT_TOWER : #***********************HANOI 286 add special code to open
+    elif req.action == MOVE_TO_LEFT_TOWER :
         
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Moving to LEFT_TOWER")
             active_tower = 1
-            success = MoveToPose(left_tower)
+            success = MoveToPose(reqlimb, left_tower)
             print "Moved To LEFT TOWER: %r" % success
         elif environment == "symbolic":
             rospy.loginfo("MOVE TO LEFT TOWER")
@@ -319,17 +316,17 @@ def move_robot(req,reqlimb):
             l.position.z += block_size
             active_tower = 1
 
-            success = MoveToPose(l)
+            success = MoveToPose(reqlimb, l)
             print "Moved To above LEFT TOWER: %r" % success
         elif environment == "symbolic":
             rospy.loginfo("MOVE TO ABOVE LEFT TOWER")
 
-    elif req.action == MOVE_TO_MID_TOWER : #***********************HANOI 286 add special code to open
+    elif req.action == MOVE_TO_MID_TOWER :
      
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Moving to MID_TOWER")
             active_tower = 2
-            success = MoveToPose(mid_tower)
+            success = MoveToPose(reqlimb, mid_tower)
             print "Moved To MID TOWER: %r" % success
         elif environment == "symbolic":
             rospy.loginfo("MOVE TO MID TOWER")
@@ -342,18 +339,18 @@ def move_robot(req,reqlimb):
             l = deepcopy(mid_tower)
             active_tower = 2
             l.position.z += block_size
-            success = MoveToPose(l)
+            success = MoveToPose(reqlimb, l)
             print "Moved To ABOVE MID TOWER: %r" % success
         elif environment == "symbolic":
             rospy.loginfo("MOVE TO ABOVE MID TOWER")
 
 
-    elif req.action == MOVE_TO_RIGHT_TOWER : #***********************HANOI 286 add special code to open
+    elif req.action == MOVE_TO_RIGHT_TOWER :
      
         if environment == "simulator" or environment == "robot":
             rospy.loginfo("Moving to RIGHT TOWER")
             active_tower = 3
-            success = MoveToPose(right_tower)
+            success = MoveToPose(reqlimb, right_tower)
             print "Moved To RIGHT TOWER: %r" % success
         elif environment == "symbolic":
             rospy.loginfo("MOVE TO RIGHT TOWER")
@@ -365,7 +362,7 @@ def move_robot(req,reqlimb):
             l = deepcopy(right_tower)
             active_tower = 3
             l.position.z += block_size
-            success = MoveToPose(l)
+            success = MoveToPose(reqlimb, l)
             print "Moved To ABOVE RIGHT TOWER: %r" % success
         elif environment == "symbolic":
             rospy.loginfo("MOVE TO ABOVE RIGHT TOWER")
