@@ -543,8 +543,16 @@ def move_robot(req,reqlimb):
         
 
 
-    elif req.action == WAIT_FOR_DONE :
-        rospy.loginfo("Waiting for arm to finish.")
+    elif req.action == MOVE_TO_RESTING :
+        if environment == "simulator" or environment == "robot":
+            rospy.loginfo("Moving to resting")
+            
+            p = rest_pose_left if reqlimb == "left" else rest_pose_right
+            success = MoveToPose(reqlimb, p, True, False, False)
+
+            print "Moved To Resting : %r" % success
+        elif environment == "symbolic":
+            rospy.loginfo("Pretending to move to resting")
     else :
         print "invalid action"
 
