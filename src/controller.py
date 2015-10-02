@@ -196,7 +196,7 @@ def stack_ascending_parallel():
     log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
     move_robot(CLOSE_GRIPPER, current_block1)
 
-    while current_block1 < n-2 and current_block2 < n-1:
+    while current_block1 < n-1 and current_block2 < n:
 
         lock_other.acquire()
         log_info("Beginning to move {0} hand to block {1}".format(limb_other,current_block2))
