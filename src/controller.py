@@ -196,7 +196,7 @@ def stack_ascending_parallel():
     log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
     move_robot(CLOSE_GRIPPER, current_block1)
 
-    while current_block1 < n and current_block2 < n:
+    while current_block1 < n-2 and current_block2 < n-1:
 
         lock_other.acquire()
         log_info("Beginning to move {0} hand to block {1}".format(limb_other,current_block2))
@@ -307,7 +307,11 @@ def stack_ascending_parallel():
         log_info("Beginning to open {0} gripper to release block {1} stack".format(limb_other,current_block2))
         move_robot_other(OPEN_GRIPPER, current_block2-1)
 
+    lock_other.acquire()
+    lock.acquire()
     log_info("\nSuccessfully stacked blocks stack_ascending_parallel.\n\n")
+    lock_other.release()
+    lock.release()
 
 
 
@@ -413,7 +417,7 @@ def stack_descending_parallel():
     log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
     move_robot(CLOSE_GRIPPER, current_block1)
 
-    while current_block1 > 0 and current_block2 > 0:
+    while current_block1 > 3 and current_block2 > 2:
 
         lock_other.acquire()
         log_info("Beginning to move {0} hand to block {1}".format(limb_other,current_block2))
@@ -475,7 +479,9 @@ def stack_descending_parallel():
     lock.acquire()
     lock_other.acquire()
     remain = len(get_state().table)
-    # print "remain: %d" % remain
+    print "##############################################"
+    print "remain: %d" % remain
+    print "##############################################"    
     lock.release()
     lock_other.release()
 
@@ -524,7 +530,11 @@ def stack_descending_parallel():
         log_info("Beginning to open {0} gripper to release block {1} stack".format(limb_other,current_block2))
         move_robot_other(OPEN_GRIPPER, current_block2+1)
 
+    lock.acquire()
+    lock_other.acquire()
     log_info("\nSuccessfully stacked blocks stack_descending_parallel.\n\n")
+    lock.release()
+    lock_other.release()
 
 
 def scatter_parallel(): # left arm must start if even on top, right arm if odd on top
