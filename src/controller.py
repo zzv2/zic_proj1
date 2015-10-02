@@ -222,9 +222,11 @@ def stack_ascending_parallel():
         log_info("Beginning to open {0} gripper to release block {1} onto stack.".format(limb,current_block1))
         move_robot(OPEN_GRIPPER, current_block1-1)
 
+        lock_other.acquire()
         lock.acquire()
         log_info("Successfully {0} deposited block {1} onto stack".format(limb,current_block1))
         current_block1 += 2
+        lock_other.release()
         lock.release()
 
         lock_other.acquire()
@@ -289,8 +291,10 @@ def stack_ascending_parallel():
         move_robot(OPEN_GRIPPER, current_block1-1)
 
         lock.acquire()
+        lock_other.acquire()
         log_info("Successfully {0} deposited block {1} onto stack".format(limb,current_block1))
         lock.release()
+        lock_other.release()
 
     if remain > 1:
 
@@ -361,11 +365,14 @@ def stack_descending():
         log_info("Releasing gripper around block {0}".format(i))
         lock.acquire()
         move_robot(OPEN_GRIPPER, i+1)
+
         lock.acquire()
-        lock.release()
         log_info("Released block {0} from gripper".format(i))
-    
+        lock.release()
+
+    lock.acquire()    
     log_info("\nSuccessfully stacked blocks descending.\n\n")
+    lock.release()
 
 
 def stack_descending_parallel():
@@ -444,9 +451,11 @@ def stack_descending_parallel():
         move_robot(OPEN_GRIPPER, current_block1+1)
 
         lock.acquire()
+        lock_other.acquire()
         log_info("Successfully {0} deposited block {1} onto stack".format(limb,current_block1))
         current_block1 -= 2
         lock.release()
+        lock_other.release()
 
         lock_other.acquire()
         log_info("Successfully closed {0} gripper around block {1}".format(limb_other,current_block2))
@@ -479,9 +488,7 @@ def stack_descending_parallel():
     lock.acquire()
     lock_other.acquire()
     remain = len(get_state().table)
-    print "##############################################"
     print "remain: %d" % remain
-    print "##############################################"    
     lock.release()
     lock_other.release()
 
@@ -511,8 +518,10 @@ def stack_descending_parallel():
         log_info("Beginning to open {0} gripper to release block {1} onto stack.".format(limb,current_block1))
         move_robot(OPEN_GRIPPER, current_block1+1)
 
+        lock_other.acquire()
         lock.acquire()
         log_info("Successfully {0} deposited block {1} onto stack".format(limb,current_block1))
+        lock_other.release()
         lock.release()
 
     if remain > 1:
@@ -530,6 +539,13 @@ def stack_descending_parallel():
         log_info("Beginning to open {0} gripper to release block {1} stack".format(limb_other,current_block2))
         move_robot_other(OPEN_GRIPPER, current_block2+1)
 
+        lock.acquire()
+        lock_other.acquire()
+        log_info("Successfully {0} deposited block {1} onto stack".format(limb_other,current_block2))
+        lock.release()
+        lock_other.release()
+
+
     lock.acquire()
     lock_other.acquire()
     log_info("\nSuccessfully stacked blocks stack_descending_parallel.\n\n")
@@ -537,7 +553,7 @@ def stack_descending_parallel():
     lock_other.release()
 
 
-def scatter_parallel(): # left arm must start if even on top, right arm if odd on top
+def scatter_parallel():
     num_arms = rospy.get_param("num_arms")
     if not num_arms == 2:
         raise Exception("num_arms needs to be 2 for scatter_parallel")
@@ -577,26 +593,25 @@ def scatter_parallel(): # left arm must start if even on top, right arm if odd o
     log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
     lock.acquire()
     move_robot(CLOSE_GRIPPER, current_block1)
-    log_info("Successfully closed {0} gripper around block {1}".format(current_block1,limb))
 
 
 
     log_info("Begining to move {0} gripper over table position for block {1}".format(limb,current_block1))
     lock.acquire()
     move_robot(MOVE_OVER_TABLE, current_block1)
-    log_info("Successfully moved {0} gripper over table position for block {1}".format(limb,current_block1))
 
 
-    log_info("Beginning to move {0} hand to block {1}".format(limb_other,current_block2))
     lock_other.acquire()
+    log_info("Beginning to move {0} hand to block {1}".format(limb_other,current_block2))
+    log_info("Successfully closed {0} gripper around block {1}".format(current_block1,limb))
     move_robot_other(MOVE_TO_BLOCK, current_block2)
     log_info("Successfully moved {0} hand to block {1}".format(limb_other,current_block2))
 
 
 
-
-    log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb,current_block1))
     lock.acquire()
+    log_info("Successfully moved {0} gripper over table position for block {1}".format(limb,current_block1))
+    log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb,current_block1))
     move_robot(OPEN_GRIPPER, -1)
     log_info("Successfully {0} deposited block {1} at its position on table".format(limb,current_block1))
 
@@ -604,7 +619,10 @@ def scatter_parallel(): # left arm must start if even on top, right arm if odd o
     log_info("Beginning to close {0} gripper around block {1}".format(limb_other,current_block2))
     lock_other.acquire()
     move_robot_other(CLOSE_GRIPPER, current_block2)
+
+    lock.acquire()
     log_info("Successfully closed {0} gripper around block {1}".format(limb_other,current_block2))
+    lock.release()
 
 
     idx -= 2
@@ -615,55 +633,53 @@ def scatter_parallel(): # left arm must start if even on top, right arm if odd o
         log_info("Beginning to move {0} hand to block {1}".format(limb,current_block1))
         lock.acquire()
         move_robot(MOVE_TO_BLOCK, current_block1)
-        log_info("Successfully moved {0} hand to block {1}".format(limb,current_block1))
 
 
         log_info("Begining to move {0} gripper over table position for block {1}".format(limb_other,current_block2))
         lock_other.acquire()
         move_robot_other(MOVE_OVER_TABLE, current_block2)
-        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb_other,current_block2))
 
 
 
 
-        log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
         lock.acquire()
+        log_info("Successfully moved {0} hand to block {1}".format(limb,current_block1))
+        log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
         move_robot(CLOSE_GRIPPER, current_block1)
-        log_info("Successfully closed {0} gripper around block {1}".format(limb,current_block1))
 
 
-        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb_other,current_block2))
         lock_other.acquire()
+        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb_other,current_block2))
+        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb_other,current_block2))
         move_robot_other(OPEN_GRIPPER, -1)
-        log_info("Successfully {0} deposited block {1} at its position on table".format(limb_other,current_block2))
 
 
         current_block2 = get_state().stack[idx-1]
 
 
+        lock_other.acquire()
+        log_info("Successfully {0} deposited block {1} at its position on table".format(limb_other,current_block2))
         log_info("Beginning to move {0} hand to block {1}".format(limb_other,current_block2))
-        lock_other.acquire()
         move_robot_other(MOVE_TO_BLOCK, current_block2)
-        log_info("Successfully moved {0} hand to block {1}".format(limb_other,current_block2))
 
 
+        lock.acquire()
+        log_info("Successfully closed {0} gripper around block {1}".format(limb,current_block1))
         log_info("Begining to move {0} gripper over table position for block {1}".format(limb,current_block1))
-        lock.acquire()
         move_robot(MOVE_OVER_TABLE, current_block1)
-        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb,current_block1))
 
 
 
 
-        log_info("Beginning to close {0} gripper around block {1}".format(limb_other,current_block2))
         lock_other.acquire()
+        log_info("Successfully moved {0} hand to block {1}".format(limb_other,current_block2))
+        log_info("Beginning to close {0} gripper around block {1}".format(limb_other,current_block2))
         move_robot_other(CLOSE_GRIPPER, current_block2)
-        log_info("Successfully closed {0} gripper around block {1}".format(limb_other,current_block2))
 
-        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb,current_block1))
         lock.acquire()
+        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb,current_block1))
+        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb,current_block1))
         move_robot(OPEN_GRIPPER, -1)
-        log_info("Successfully {0} deposited block {1} at its position on table".format(limb,current_block1))
 
         idx -= 2
     
@@ -678,44 +694,56 @@ def scatter_parallel(): # left arm must start if even on top, right arm if odd o
         current_block1 = get_state().stack[idx]
 
         if remain > 1:
-            log_info("Beginning to move {0} hand to block {1}".format(limb,current_block1))
             lock.acquire()
+            log_info("Successfully {0} deposited block {1} at its position on table".format(limb,current_block1))
+            log_info("Beginning to move {0} hand to block {1}".format(limb,current_block1))
             move_robot(MOVE_TO_BLOCK, current_block1)
-            log_info("Successfully moved {0} hand to block {1}".format(limb,current_block1))
 
 
-        log_info("Begining to move {0} gripper over table position for block {1}".format(limb_other,current_block2))
         lock_other.acquire()
+        log_info("Successfully closed {0} gripper around block {1}".format(limb_other,current_block2))
+        log_info("Begining to move {0} gripper over table position for block {1}".format(limb_other,current_block2))
         move_robot_other(MOVE_OVER_TABLE, current_block2)
-        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb_other,current_block2))        
 
         if remain > 1:
-            log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
             lock.acquire()
+            log_info("Successfully moved {0} hand to block {1}".format(limb,current_block1))
+            log_info("Beginning to close {0} gripper around block {1}".format(limb,current_block1))
             move_robot(CLOSE_GRIPPER, current_block1)
-            log_info("Successfully closed {0} gripper around block {1}".format(limb,current_block1))
 
-        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb_other,current_block2))
         lock_other.acquire()
+        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb_other,current_block2))        
+        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb_other,current_block2))
         move_robot_other(OPEN_GRIPPER, -1)
+
+        lock_other.acquire()
         log_info("Successfully {0} deposited block {1} at its position on table".format(limb_other,current_block2))
+        lock_other.release()
 
 
     if remain > 1:
         current_block2 = get_state().stack[idx-1]
 
+        lock.acquire()
+        log_info("Successfully closed {0} gripper around block {1}".format(limb,current_block1))
         log_info("Begining to move {0} gripper over table position for block {1}".format(limb,current_block1))
-        lock.acquire()
         move_robot(MOVE_OVER_TABLE, current_block1)
-        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb,current_block1))
 
 
-        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb,current_block1))
         lock.acquire()
+        log_info("Successfully moved {0} gripper over table position for block {1}".format(limb,current_block1))
+        log_info("Beginning to open {0} gripper to release block {1} onto table.".format(limb,current_block1))
         move_robot(OPEN_GRIPPER, -1)
-        log_info("Successfully {0} deposited block {1} at its position on table".format(limb,current_block1))
 
+        lock.acquire()
+        log_info("Successfully {0} deposited block {1} at its position on table".format(limb,current_block1))
+        lock.release()
+
+    lock.acquire()
+    lock_other.acquire()
     log_info("\nSuccessfully stacked blocks scatter_parallel.\n\n")
+    lock.release()
+    lock_other.release()
 
 def odd_even(): # left arm must start if even on top, right arm if odd on top
     num_arms = rospy.get_param("num_arms")
@@ -903,7 +931,11 @@ def odd_even(): # left arm must start if even on top, right arm if odd on top
         move_robot(OPEN_GRIPPER, -1)
         log_info("Successfully {0} deposited block {1} at its position on stack".format(limb,current_block1))
 
+    lock.acquire()
+    lock_other.acquire()
     log_info("\nSuccessfully stacked blocks odd_even.\n\n")
+    lock.release()
+    lock_other.release()
 
 def respond_to_command(command):
     log_info("Recieved Command.")

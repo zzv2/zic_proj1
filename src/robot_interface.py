@@ -118,7 +118,7 @@ def robot_interface():
     right_limb_subscriber = rospy.Subscriber("/robot/limb/right/endpoint_state", EndpointState, respondToEndpointRight)
     log_info("Subscribed to right endpoint state")
     left_limb_subscriber = rospy.Subscriber("/robot/limb/left/endpoint_state", EndpointState, respondToEndpointLeft)
-    log_ifno("Subscribed to left endpoint state")
+    log_info("Subscribed to left endpoint state")
     rospy.loginfo("Subscribed to topic /endpoint_state")
     
     log_info("Initializing move robot service group")
@@ -164,8 +164,8 @@ def robot_interface():
     state.table = []
     log_info("Initialized State")
 
-    log_info("configuration: %s",config)
-    log_info("num_blocks: %d",num_blocks)
+    log_info("configuration: %s"%config)
+    log_info("num_blocks: %d"%num_blocks)
 
     broadcast_rate = rospy.Rate(1) # 1 hz
     # HomePose()
@@ -208,6 +208,8 @@ def initBlockPositions(EndpointState):
     if initial_pose == Pose() :
         log_info("Initializing block positions")
 
+        rospy.sleep(1)
+
         initial_pose = deepcopy(EndpointState.pose)
         rest_pose_right.position.z = initial_pose.position.z + 2 * block_size
         rest_pose_left.position.z = initial_pose.position.z + 2 * block_size
@@ -222,18 +224,20 @@ def initBlockPositions(EndpointState):
         log_info("Initialized block positions")
         # print block_poses
 
-    log_info("Initializing Tower Positions")
-    global left_tower, right_tower, mid_tower, left #**HANOI
-    left = num_blocks
-    left_tower = deepcopy(EndpointState.pose)
+        log_info("Initializing Tower Positions")
+        global left_tower, right_tower, mid_tower, left #**HANOI
+        left = num_blocks
+        left_tower = deepcopy(EndpointState.pose)
 
-    mid_tower = deepcopy(left_tower)
-    mid_tower.position.y += block_size * 3
-    mid_tower.position.z = table_z - (1 * block_size)
+        mid_tower = deepcopy(left_tower)
+        mid_tower.position.y += block_size * 3
+        mid_tower.position.z = table_z - (1 * block_size)
 
-    right_tower = deepcopy(mid_tower)
-    right_tower.position.y += block_size * 3
-    log_info("Initialized Tower Positions")
+        right_tower = deepcopy(mid_tower)
+        right_tower.position.y += block_size * 3
+        log_info("Initialized Tower Positions")
+
+        rospy.sleep(1)
 
 def handle_move_robot(req):
     Arm(move_robot, req).start()
@@ -270,6 +274,7 @@ def move_robot(req,reqlimb):
     global gripper_right
     global rest_pose_right
     global rest_pose_left
+    global state
 
     global left_tower, mid_tower, right_tower, left, mid, right, active_tower
     
@@ -419,27 +424,23 @@ def move_robot(req,reqlimb):
 
             log_info("Opened Gripper")
 
-            # print "##################################"
-            # print block_poses
-            # print "##################################"
-
             if state.block_in_gripper[idx] > 0 :
                 # print "Saving block {0} new pose into {1} index".format(state.block_in_gripper,state.block_in_gripper - 1)
                 if num_arms == 1:
                     curr_hand_pose = deepcopy(hand_pose_left) if reqlimb == "left" else deepcopy(hand_pose_right)
-                    block_poses[(state.block_in_gripper[idx] - 1)] = deepcopy(curr_hand_pose)
+                    tempidx = state.block_in_gripper[idx]
+                    # print "###########################################"
+                    # # print tempidx
+                    # print len(block_poses)
+                    # print block_poses
+                    # print block_poses[tempidx - 1]
+                    # print "###########################################"
+                    block_poses[tempidx - 1] = deepcopy(curr_hand_pose)
                 if num_arms == 2:
                     curr_hand_pose = deepcopy(hand_pose_left) if reqlimb == "left" else deepcopy(hand_pose_right)
                     block_poses[(state.block_in_gripper[idx] - 1)] = deepcopy(curr_hand_pose)
 
             rospy.sleep(GRIPPER_WAIT)
-
-            # move the arms out of the way after they put down the block
-            # if num_arms == 2:
-            #     if reqlimb == "left":
-            #         success = MoveToPose("left", rest_pose_left, True, False, False)
-            #     elif reqlimb == "right":
-            #         success = MoveToPose("right", rest_pose_right, True, False, False)
 
         elif environment == "symbolic":
             log_info("Pretending to open gripper.")
@@ -484,12 +485,6 @@ def move_robot(req,reqlimb):
         if environment == "simulator" or environment == "robot":
             log_info("Moving to block {0}".format(req.target))
 
-            # print "###############################################"
-            # print "limb: {0}, block_in_gripper: {1}, gripper_closed: {2}".format(reqlimb,block_in_gripper,gripper_closed)
-            # print "state.block_in_gripper_left: {0}, state.block_in_gripper_right: {1}".format(state.block_in_gripper_left,state.block_in_gripper_right)
-            # print "state.gripper_closed_left: {0}, state.gripper_closed_right: {1}".format(state.gripper_closed_left,state.gripper_closed_right)
-            # print "###############################################"
-
             if state.block_in_gripper[idx] > 0 or state.gripper_closed[idx]:
                 success = False
                 log_info("Failed because block in gripper or gripper closed")
@@ -512,13 +507,18 @@ def move_robot(req,reqlimb):
     elif req.action == MOVE_OVER_BLOCK :
 
         if environment == "simulator" or environment == "robot":
-            log_info("Trying to Move OVER Block %d",req.target)
+            log_info("Trying to Move OVER Block %d"%req.target)
             temppose = deepcopy(block_poses[(req.target-1)])
 
-            offset = .008
+            offsetY = 0
+            if num_arms == 2:
+                offsetY = -.0125 if reqlimb == "left" else 0
+
+            offsetZ = .008
             if req.target in state.stack:
                 temppose = deepcopy(initial_pose)
-                temppose.position.z = table_z + len(state.stack) * block_size + offset
+                temppose.position.z = table_z + len(state.stack) * block_size + offsetZ
+                temppose.position.y += offsetY
             else:
                 temppose.position.z += block_size
 
@@ -526,7 +526,7 @@ def move_robot(req,reqlimb):
 
             log_info("Moved OVER Block is : {0}".format(success))
         elif environment == "symbolic":
-            log_info("Pretending to Move OVER Block %d",req.target)
+            log_info("Pretending to Move OVER Block %d"%req.target)
         
 
 
@@ -537,7 +537,7 @@ def move_robot(req,reqlimb):
 
             num_per_row = 4
 
-            delY = ( (req.target-1) % num_per_row + 2 ) * 2 * block_size
+            delY = ( (req.target-1) % num_per_row + 3 ) * 2 * block_size
             delX = -1 * (int( (req.target-1)/num_per_row ) - 1) * 2 * block_size
             if num_arms == 2:
                 if reqlimb == "right":
@@ -582,7 +582,7 @@ def move_robot(req,reqlimb):
             p = rest_pose_left if reqlimb == "left" else rest_pose_right
             success = MoveToPose(reqlimb, p, True, False, False)
 
-            log_info("Moved To Resting : {0}".success))
+            log_info("Moved To Resting : {0}".format(success))
         elif environment == "symbolic":
             log_info("Pretending to move to resting")
     else :
@@ -598,6 +598,7 @@ def move_robot(req,reqlimb):
         log_info("Unlocked right arm")
 
 def handle_get_world_state(req):
+    global state
     resp = GetStateResponse()
     resp.gripper_closed = state.gripper_closed
     resp.block_in_gripper = state.block_in_gripper
@@ -658,7 +659,7 @@ def MoveToIntermediatePose(cur_limb, pose) :
     joint_solution = inverse_kinematics(cur_limb, interpose)
     if joint_solution != [] :
         moveArm(cur_limb, joint_solution)
-        rospy.sleep(MOVE_WAIT) #just a made up value atm
+        rospy.sleep(MOVE_WAIT)
         return True
     else :
         log_err("FAILED MoveToIntermediatePose")
@@ -666,15 +667,14 @@ def MoveToIntermediatePose(cur_limb, pose) :
 
 def moveArm (cur_limb, joint_solution) :
     arm = Limb(cur_limb)
-    arm.move_to_joint_positions(joint_solution)
+    arm.move_to_joint_positions(joint_solution, timeout=7.0)
     rospy.sleep(0.01)
 
 #takes position in base frame of where hand is to go
 #calculates ik and moves limb to that location
 #returns 1 if successful and 0 if invalid solution
 def inverse_kinematics(cur_limb, pose) :
-    # given x,y,z will call ik for this position with identity quaternion
-    # in base frame
+    # given x,y,z will call ik for this position with identity quaternion in base frame
     ikreq = SolvePositionIKRequest()
 
     hdr = Header(stamp=rospy.Time.now(), frame_id='base')
@@ -697,10 +697,9 @@ def inverse_kinematics(cur_limb, pose) :
             resp = iksvc_right(ikreq)
     except (rospy.ServiceException, rospy.ROSException), e:
         log_err("Service call failed: %s" % (e,))
-        new_pose = deepcopy(pose)
-        new_pose.position.z -= 0.01
-        log_info("Trying recursive pose call, ...")
-        return inverse_kinematics(cur_limb, new_pose)
+ #       new_pose = deepcopy(pose)
+ 
+        return []
 
     if (resp.isValid[0]):
         log_info("SUCCESS - Valid Joint Solution Found:")
@@ -709,10 +708,9 @@ def inverse_kinematics(cur_limb, pose) :
         return limb_joints
     else :
         log_err("Invalid pose")
-        new_pose = deepcopy(pose)
-        new_pose.position.z -= 0.01
-        log_info("Trying recursive pose call, ...")
-        return inverse_kinematics(cur_limb, new_pose)
+#        new_pose = deepcopy(pose)
+
+        return []
 
 class Arm(Thread):
     def __init__(self, target, *args):
